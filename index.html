@@ -1,4 +1,4 @@
-     }<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -10,7 +10,6 @@
         @media print { .no-print { display: none; } }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        .js-error { display: none; }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -88,18 +87,26 @@
                 </div>
             </div>
 
+            <!-- Alerta de Devedores -->
+            <div id="alertaDevedores" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6" style="display: none;">
+                <div class="flex items-center mb-3">
+                    <span class="text-2xl mr-3">⚠️</span>
+                    <div>
+                        <p class="font-semibold text-yellow-800">Pedidos aguardando pagamento</p>
+                        <p class="text-sm text-yellow-700">Total em aberto (todos os períodos): <span id="totalDevedor" class="font-bold">R$ 0,00</span> (<span id="quantidadeDevedores">0</span> pedidos)</p>
+                    </div>
+                </div>
+                <div id="listaDevedores" class="space-y-1"></div>
+            </div>
+
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="bg-white p-6 rounded-lg shadow">
                     <h3 class="text-lg font-semibold mb-4">Resumo Financeiro</h3>
-                    <div id="resumoFinanceiro" class="space-y-3">
-                        <!-- Conteúdo preenchido via JS -->
-                    </div>
+                    <div id="resumoFinanceiro" class="space-y-3"></div>
                 </div>
                 <div class="bg-white p-6 rounded-lg shadow">
                     <h3 class="text-lg font-semibold mb-4">Top Produtos</h3>
-                    <div id="topProdutos" class="space-y-2">
-                        <!-- Conteúdo preenchido via JS -->
-                    </div>
+                    <div id="topProdutos" class="space-y-2"></div>
                 </div>
             </div>
         </div>
@@ -119,9 +126,7 @@
                     <textarea id="observacoesPedido" placeholder="Observações" class="w-full px-3 py-2 border rounded-md" rows="2"></textarea>
                 </div>
 
-                <div id="produtosPorCategoria" class="mb-4">
-                    <!-- Produtos organizados por categoria via JS -->
-                </div>
+                <div id="produtosPorCategoria" class="mb-4"></div>
 
                 <div id="itensPedido" class="mb-4 p-4 bg-gray-50 rounded-lg" style="display: none;">
                     <h4 class="font-medium mb-3">Itens do Pedido:</h4>
@@ -132,13 +137,31 @@
                     </div>
                 </div>
 
+                <div class="mb-4 max-w-md">
+                    <label class="block text-sm font-medium mb-2">Forma de Pagamento:</label>
+                    <select id="formaPagamentoPedido" class="w-full px-3 py-2 border rounded-md">
+                        <option value="Devedor">🔴 Devedor (não pagou)</option>
+                        <option value="Dinheiro">💵 Dinheiro</option>
+                        <option value="PIX">📱 PIX</option>
+                        <option value="Cartão">💳 Cartão</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">💡 Pedidos "Devedor" não entram na receita do dashboard até serem pagos.</p>
+                </div>
+
                 <button onclick="finalizarPedido()" class="bg-orange-600 text-white px-6 py-3 rounded-md hover:bg-orange-700">
                     💾 Finalizar Pedido
                 </button>
             </div>
 
             <div class="bg-white p-6 rounded-lg shadow">
-                <h3 class="text-lg font-semibold mb-4">Pedidos do Período</h3>
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">Pedidos do Período</h3>
+                    <select id="filtroPagamento" onchange="atualizarListaPedidos()" class="px-3 py-2 border rounded-md text-sm">
+                        <option value="todos">Todos</option>
+                        <option value="pagos">Pagos</option>
+                        <option value="Devedor">Devedores</option>
+                    </select>
+                </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead>
@@ -146,14 +169,13 @@
                                 <th class="text-left py-3 px-2">Data/Hora</th>
                                 <th class="text-left py-3 px-2">Cliente</th>
                                 <th class="text-left py-3 px-2">Telefone</th>
+                                <th class="text-left py-3 px-2">Pagamento</th>
                                 <th class="text-left py-3 px-2">Itens</th>
                                 <th class="text-right py-3 px-2">Total</th>
                                 <th class="text-center py-3 px-2">Ações</th>
                             </tr>
                         </thead>
-                        <tbody id="listaPedidos">
-                            <!-- Conteúdo via JS -->
-                        </tbody>
+                        <tbody id="listaPedidos"></tbody>
                     </table>
                 </div>
             </div>
@@ -184,7 +206,7 @@
                         ➕ Adicionar
                     </button>
                 </div>
-                
+
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead>
@@ -198,9 +220,7 @@
                                 <th class="text-center py-3 px-2">Ações</th>
                             </tr>
                         </thead>
-                        <tbody id="listaIngredientes" class="sortable-ingredientes">
-                            <!-- Conteúdo via JS -->
-                        </tbody>
+                        <tbody id="listaIngredientes"></tbody>
                     </table>
                 </div>
             </div>
@@ -210,18 +230,12 @@
                 <h3 class="text-lg font-semibold mb-4">Nova Receita/Produto</h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <input type="text" id="nomeReceita" placeholder="Nome do produto" class="px-3 py-2 border rounded-md">
-                    <select id="categoriaReceita" class="px-3 py-2 border rounded-md">
-                        <!-- Categorias via JS -->
-                    </select>
+                    <select id="categoriaReceita" class="px-3 py-2 border rounded-md"></select>
                     <button onclick="criarReceita()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
                         📝 Criar Receita
                     </button>
                 </div>
-
-                <!-- Lista de Receitas -->
-                <div id="listaReceitas">
-                    <!-- Receitas via JS -->
-                </div>
+                <div id="listaReceitas"></div>
             </div>
 
             <!-- Editor de Receita -->
@@ -231,7 +245,7 @@
                     <div class="flex gap-2">
                         <button onclick="salvarReceita()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">💾 Salvar</button>
                         <button onclick="enviarParaProdutos()" class="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700">🍕 Enviar p/ Produtos</button>
-                        <button onclick="fecharEditor()" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">❌ Fechar</button>
+                        <button onclick="fecharEditor()" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">✖ Fechar</button>
                     </div>
                 </div>
 
@@ -239,7 +253,6 @@
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
                     <select id="ingredienteReceita" class="px-3 py-2 border rounded-md">
                         <option value="">Selecionar ingrediente</option>
-                        <!-- Ingredientes via JS -->
                     </select>
                     <input type="number" id="quantidadeIngredienteReceita" step="0.01" placeholder="Quantidade" class="px-3 py-2 border rounded-md">
                     <span id="unidadeAtual" class="px-3 py-2 bg-white border rounded-md flex items-center">-</span>
@@ -251,6 +264,7 @@
                     <table class="w-full text-sm">
                         <thead>
                             <tr class="border-b bg-gray-50">
+                                <th class="text-left py-3 px-2">🔄</th>
                                 <th class="text-left py-3 px-2">Ingrediente</th>
                                 <th class="text-right py-3 px-2">Quantidade</th>
                                 <th class="text-left py-3 px-2">Unidade</th>
@@ -259,9 +273,7 @@
                                 <th class="text-center py-3 px-2">Ações</th>
                             </tr>
                         </thead>
-                        <tbody id="ingredientesReceita">
-                            <!-- Conteúdo via JS -->
-                        </tbody>
+                        <tbody id="ingredientesReceita"></tbody>
                     </table>
                 </div>
 
@@ -271,21 +283,31 @@
                         <span>Custo Total da Receita:</span>
                         <span id="custoTotalReceita" class="text-green-600">R$ 0,00</span>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label class="block text-sm font-medium mb-1">Margem de Lucro (%):</label>
-                            <input type="number" id="margemLucroReceita" min="0" max="90" step="1" value="60" 
-                                   onchange="calcularPrecoSugerido()" class="px-3 py-2 border rounded-md w-full">
+                            <label class="block text-sm font-medium mb-1">Margem desejada (%):</label>
+                            <input type="number" id="margemLucroReceita" min="0" max="90" step="1" value="60"
+                                   oninput="atualizarSugestao()" class="px-3 py-2 border rounded-md w-full">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Preço sugerido (só referência):</label>
+                            <div class="flex gap-2">
+                                <span id="precoSugeridoTexto" class="flex-1 px-3 py-2 bg-white border rounded-md">R$ 0,00</span>
+                                <button onclick="usarPrecoSugerido()" class="bg-blue-600 text-white px-3 py-2 rounded-md hover:bg-blue-700 text-sm">Usar</button>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-sm font-medium mb-1">Preço de Venda:</label>
-                            <input type="number" id="precoVendaSugerido" step="0.01" 
-                                   onchange="calcularMargemReversa()" class="px-3 py-2 border rounded-md w-full">
+                            <input type="number" id="precoVendaSugerido" step="0.01"
+                                   oninput="atualizarMargemReal()" class="px-3 py-2 border rounded-md w-full">
                         </div>
                     </div>
+                    <div class="mt-3 text-sm text-gray-700">
+                        Margem real com o preço de venda atual: <strong id="margemRealTexto">-</strong>
+                    </div>
                     <div class="mt-2 text-sm text-gray-600">
-                        <p>💡 <strong>Margem:</strong> Percentual de lucro sobre o preço final</p>
-                        <p>📊 <strong>Fórmula:</strong> Preço = Custo ÷ (1 - Margem%/100)</p>
+                        <p>💡 <strong>O preço de venda não muda sozinho</strong> quando você altera ingredientes ou seus preços. Só muda se você editar ou clicar em "Usar".</p>
+                        <p>📊 <strong>Fórmula sugerida:</strong> Preço = Custo ÷ (1 - Margem%/100)</p>
                     </div>
                 </div>
             </div>
@@ -298,16 +320,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                     <input type="text" id="descricaoSaida" placeholder="Descrição *" class="px-3 py-2 border rounded-md">
                     <input type="number" id="valorSaida" step="0.01" placeholder="Valor *" class="px-3 py-2 border rounded-md">
-                    <select id="categoriaSaida" class="px-3 py-2 border rounded-md">
-                        <option>Ingredientes</option>
-                        <option>Aluguel</option>
-                        <option>Funcionários</option>
-                        <option>Energia/Água</option>
-                        <option>Gás</option>
-                        <option>Marketing</option>
-                        <option>Equipamentos</option>
-                        <option>Outros</option>
-                    </select>
+                    <select id="categoriaSaida" class="px-3 py-2 border rounded-md"></select>
                     <select id="formaPagamentoSaida" class="px-3 py-2 border rounded-md">
                         <option>Dinheiro</option>
                         <option>PIX</option>
@@ -335,9 +348,7 @@
                                 <th class="text-center py-3 px-2">Ações</th>
                             </tr>
                         </thead>
-                        <tbody id="listaSaidas">
-                            <!-- Conteúdo via JS -->
-                        </tbody>
+                        <tbody id="listaSaidas"></tbody>
                     </table>
                 </div>
             </div>
@@ -351,18 +362,13 @@
                     <input type="text" id="nomeProduto" placeholder="Nome do produto *" class="px-3 py-2 border rounded-md">
                     <input type="number" id="custoProduto" step="0.01" placeholder="Custo *" class="px-3 py-2 border rounded-md">
                     <input type="number" id="precoProduto" step="0.01" placeholder="Preço *" class="px-3 py-2 border rounded-md">
-                    <select id="categoriaProduto" class="px-3 py-2 border rounded-md">
-                        <!-- Opções via JS -->
-                    </select>
+                    <select id="categoriaProduto" class="px-3 py-2 border rounded-md"></select>
                 </div>
                 <button onclick="adicionarProduto()" class="mt-4 bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700">
                     ➕ Adicionar Produto
                 </button>
             </div>
-
-            <div id="listaProdutosPorCategoria">
-                <!-- Produtos organizados por categoria via JS -->
-            </div>
+            <div id="listaProdutosPorCategoria"></div>
         </div>
 
         <!-- Calculadora -->
@@ -372,7 +378,6 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <select id="produtoCalculadora" class="px-3 py-2 border rounded-md">
                         <option value="">Selecione um produto</option>
-                        <!-- Opções via JS -->
                     </select>
                     <input type="number" id="quantidadeCalculadora" min="1" placeholder="Quantidade" class="px-3 py-2 border rounded-md">
                     <button onclick="adicionarItemCalculadora()" class="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700">
@@ -473,9 +478,7 @@
                             ➕ Adicionar
                         </button>
                     </div>
-                    <div id="listaCategorias">
-                        <!-- Categorias via JS -->
-                    </div>
+                    <div id="listaCategorias"></div>
                 </div>
             </div>
 
@@ -487,9 +490,7 @@
                         ➕ Adicionar
                     </button>
                 </div>
-                <div id="listaCategoriasSaidas">
-                    <!-- Categorias de saídas via JS -->
-                </div>
+                <div id="listaCategoriasSaidas"></div>
             </div>
 
             <div class="bg-white p-6 rounded-lg shadow mt-6">
@@ -511,7 +512,7 @@
     </div>
 
     <script>
-        // Estado global da aplicação
+        // ================= ESTADO GLOBAL =================
         let dados = {
             produtos: [
                 { id: 1, nome: 'Pizza Margherita Grande', custo: 12.50, preco: 28.00, categoria: 'Pizza' },
@@ -543,16 +544,53 @@
             receitaAtual: null
         };
 
-        // Carregar dados do localStorage
-        function carregarDados() {
-            const dadosSalvos = localStorage.getItem('pizzaria_dados');
-            if (dadosSalvos) {
-                dados = { ...dados, ...JSON.parse(dadosSalvos) };
+        // ================= UTILIDADES =================
+        function esc(s) {
+            return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        function hojeLocal() {
+            const d = new Date();
+            return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+        }
+
+        function formatarMoeda(valor) {
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
+        }
+
+        function formatarData(data) {
+            return new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
+        }
+
+        function fecharModal(id) {
+            const m = document.getElementById(id);
+            if (m) m.remove();
+        }
+
+        function normalizarDados() {
+            dados.ingredientes.forEach(i => { i.precoUnidade = i.preco / i.quantidade; });
+            // Pedidos antigos (sem forma de pagamento) já eram contabilizados: viram "Dinheiro"
+            dados.pedidos.forEach(p => { if (!p.formaPagamento) p.formaPagamento = 'Dinheiro'; });
+            dados.receitas.forEach(r => { if (!r.ingredientes) r.ingredientes = []; });
+            dados.receitaAtual = null;
+            if (!dados.configuracoes.categorias || !dados.configuracoes.categorias.length) {
+                dados.configuracoes.categorias = ['Pizza', 'Bebida', 'Sobremesa', 'Outros'];
             }
-            // Configurar datas padrão
-            const hoje = new Date().toISOString().split('T')[0];
-            const inicioMes = new Date().toISOString().slice(0, 7) + '-01';
-            document.getElementById('dataInicio').value = inicioMes;
+            if (!dados.configuracoes.categoriasSaidas || !dados.configuracoes.categoriasSaidas.length) {
+                dados.configuracoes.categoriasSaidas = ['Ingredientes', 'Aluguel', 'Funcionários', 'Energia/Água', 'Gás', 'Marketing', 'Equipamentos', 'Outros'];
+            }
+        }
+
+        function carregarDados() {
+            const salvos = localStorage.getItem('pizzaria_dados');
+            if (salvos) {
+                try { dados = { ...dados, ...JSON.parse(salvos) }; }
+                catch (e) { console.error('Erro ao ler dados salvos:', e); }
+            }
+            normalizarDados();
+
+            const hoje = hojeLocal();
+            document.getElementById('dataInicio').value = hoje.slice(0, 7) + '-01';
             document.getElementById('dataFim').value = hoje;
             document.getElementById('dataPedido').value = hoje;
             document.getElementById('dataSaida').value = hoje;
@@ -563,118 +601,114 @@
             document.getElementById('enderecoPizzaria').value = dados.configuracoes.endereco;
         }
 
-        // Salvar dados no localStorage
         function salvarDados() {
-            localStorage.setItem('pizzaria_dados', JSON.stringify(dados));
+            localStorage.setItem('pizzaria_dados', JSON.stringify({ ...dados, receitaAtual: null, simulacao: [] }));
         }
 
-        // Formatação de moeda
-        function formatarMoeda(valor) {
-            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+        // ================= NAVEGAÇÃO =================
+        function abaAtiva() {
+            const el = document.querySelector('.tab-content.active');
+            return el ? el.id : 'dashboard';
         }
 
-        // Formatação de data
-        function formatarData(data) {
-            return new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
-        }
-
-        // Mostrar aba
-        function showTab(tab) {
+        function atualizarAba(tab) {
             try {
-                // Esconder todas as abas
-                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.tab-btn').forEach(b => {
-                    b.classList.remove('bg-orange-600', 'text-white');
-                    b.classList.add('hover:bg-gray-100');
-                });
-                
-                // Mostrar aba selecionada
-                const tabElement = document.getElementById(tab);
-                if (tabElement) {
-                    tabElement.classList.add('active');
-                }
-                
-                if (event && event.target) {
-                    event.target.classList.add('bg-orange-600', 'text-white');
-                    event.target.classList.remove('hover:bg-gray-100');
-                } else {
-                    // Para chamada inicial sem event
-                    const btn = document.querySelector(`[onclick="showTab('${tab}')"]`);
-                    if (btn) {
-                        btn.classList.add('bg-orange-600', 'text-white');
-                        btn.classList.remove('hover:bg-gray-100');
-                    }
-                }
-                
-                // Atualizar conteúdo com timeout para garantir que o DOM esteja pronto
-                setTimeout(() => {
-                    try {
-                        if (tab === 'dashboard') atualizarDashboard();
-                        if (tab === 'pedidos') atualizarPedidos();
-                        if (tab === 'precificacao') atualizarPrecificacao();
-                        if (tab === 'saidas') atualizarSaidas();
-                        if (tab === 'produtos') atualizarProdutos();
-                        if (tab === 'calculadora') atualizarCalculadora();
-                        if (tab === 'config') atualizarConfig();
-                    } catch (error) {
-                        console.error('Erro ao atualizar aba:', error);
-                    }
-                }, 100);
-                
+                if (tab === 'dashboard') atualizarDashboard();
+                if (tab === 'pedidos') atualizarPedidos();
+                if (tab === 'precificacao') atualizarPrecificacao();
+                if (tab === 'saidas') atualizarSaidas();
+                if (tab === 'produtos') atualizarProdutos();
+                if (tab === 'calculadora') atualizarCalculadora();
+                if (tab === 'config') atualizarConfig();
             } catch (error) {
-                console.error('Erro ao mostrar aba:', error);
+                console.error('Erro ao atualizar aba:', error);
             }
         }
 
-        // Filtrar dados por período
+        function showTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('bg-orange-600', 'text-white');
+                b.classList.add('hover:bg-gray-100');
+            });
+            const el = document.getElementById(tab);
+            if (el) el.classList.add('active');
+            const btn = document.querySelector(`.tab-btn[onclick="showTab('${tab}')"]`);
+            if (btn) {
+                btn.classList.add('bg-orange-600', 'text-white');
+                btn.classList.remove('hover:bg-gray-100');
+            }
+            atualizarAba(tab);
+        }
+
         function filtrarPorPeriodo(lista) {
             const inicio = document.getElementById('dataInicio').value;
             const fim = document.getElementById('dataFim').value;
             return lista.filter(item => item.data >= inicio && item.data <= fim);
         }
 
-        // Calcular estatísticas
+        // ================= DASHBOARD =================
+        function listarDevedores() {
+            return dados.pedidos.filter(p => p.formaPagamento === 'Devedor');
+        }
+
         function calcularEstatisticas() {
             const pedidosFiltrados = filtrarPorPeriodo(dados.pedidos);
+            // Só pedidos PAGOS (Dinheiro, PIX, Cartão) entram na receita
+            const pedidosPagos = pedidosFiltrados.filter(p => p.formaPagamento !== 'Devedor');
             const saidasFiltradas = filtrarPorPeriodo(dados.saidas);
-            
-            const receita = pedidosFiltrados.reduce((total, p) => total + p.total, 0);
-            const custo = pedidosFiltrados.reduce((total, p) => {
-                return total + p.itens.reduce((itemTotal, item) => {
-                    const produto = dados.produtos.find(prod => prod.id == item.produtoId);
-                    return itemTotal + (produto ? produto.custo * item.quantidade : 0);
-                }, 0);
-            }, 0);
-            const saidas = saidasFiltradas.reduce((total, s) => total + s.valor, 0);
-            
+
+            const receita = pedidosPagos.reduce((t, p) => t + p.total, 0);
+            const custo = pedidosPagos.reduce((t, p) =>
+                t + p.itens.reduce((it, item) => it + ((item.custoUnitario || 0) * item.quantidade), 0), 0);
+            const saidas = saidasFiltradas.reduce((t, s) => t + s.valor, 0);
+
             const lucroOperacional = receita - custo;
             const lucroLiquido = lucroOperacional - saidas;
             const margem = receita > 0 ? (lucroLiquido / receita) * 100 : 0;
-            const ticketMedio = pedidosFiltrados.length > 0 ? receita / pedidosFiltrados.length : 0;
-            
-            return {
-                receita, custo, saidas, lucroOperacional, lucroLiquido, margem, ticketMedio,
-                totalPedidos: pedidosFiltrados.length
-            };
+            const ticketMedio = pedidosPagos.length > 0 ? receita / pedidosPagos.length : 0;
+
+            return { receita, custo, saidas, lucroOperacional, lucroLiquido, margem, ticketMedio, totalPedidos: pedidosFiltrados.length };
         }
 
-        // Atualizar Dashboard
         function atualizarDashboard() {
             const stats = calcularEstatisticas();
-            
+
             document.getElementById('receitaTotal').textContent = formatarMoeda(stats.receita);
             document.getElementById('lucroLiquido').textContent = formatarMoeda(stats.lucroLiquido);
             document.getElementById('ticketMedio').textContent = formatarMoeda(stats.ticketMedio);
             document.getElementById('totalPedidos').textContent = stats.totalPedidos;
-            
-            // Atualizar cor do lucro
+
             const lucroEl = document.getElementById('lucroLiquido');
             lucroEl.className = `text-2xl font-bold ${stats.lucroLiquido >= 0 ? 'text-green-600' : 'text-red-600'}`;
-            
-            // Resumo financeiro
+
+            // Devedores (todos os períodos: dívida em aberto não some com o filtro de datas)
+            const devedores = listarDevedores().sort((a, b) => a.data.localeCompare(b.data));
+            const alerta = document.getElementById('alertaDevedores');
+            if (devedores.length > 0) {
+                alerta.style.display = 'block';
+                document.getElementById('totalDevedor').textContent = formatarMoeda(devedores.reduce((t, p) => t + p.total, 0));
+                document.getElementById('quantidadeDevedores').textContent = devedores.length;
+                document.getElementById('listaDevedores').innerHTML = devedores.map(p => `
+                    <div class="flex items-center justify-between bg-white border border-yellow-200 rounded px-3 py-2 text-sm">
+                        <div>
+                            <span class="font-medium">${esc(p.cliente)}</span>
+                            <span class="text-gray-500 ml-2">${formatarData(p.data)}</span>
+                            ${p.telefone ? `<span class="text-gray-500 ml-2">${esc(p.telefone)}</span>` : ''}
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="font-semibold text-yellow-700">${formatarMoeda(p.total)}</span>
+                            <button onclick="receberPagamento(${p.id})" class="bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700">💰 Receber</button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                alerta.style.display = 'none';
+            }
+
             document.getElementById('resumoFinanceiro').innerHTML = `
                 <div class="flex justify-between">
-                    <span>Receita Total:</span>
+                    <span>Receita Total (pedidos pagos):</span>
                     <span class="font-semibold text-green-600">${formatarMoeda(stats.receita)}</span>
                 </div>
                 <div class="flex justify-between">
@@ -691,63 +725,56 @@
                 </div>
                 <div class="flex justify-between border-t pt-2 text-lg">
                     <span class="font-bold">Lucro Líquido:</span>
-                    <span class="font-bold ${stats.lucroLiquido >= 0 ? 'text-green-600' : 'text-red-600'}">
-                        ${formatarMoeda(stats.lucroLiquido)}
-                    </span>
+                    <span class="font-bold ${stats.lucroLiquido >= 0 ? 'text-green-600' : 'text-red-600'}">${formatarMoeda(stats.lucroLiquido)}</span>
                 </div>
                 <div class="flex justify-between">
                     <span>Margem:</span>
-                    <span class="font-semibold ${stats.margem >= 0 ? 'text-green-600' : 'text-red-600'}">
-                        ${stats.margem.toFixed(1)}%
-                    </span>
+                    <span class="font-semibold ${stats.margem >= 0 ? 'text-green-600' : 'text-red-600'}">${stats.margem.toFixed(1)}%</span>
                 </div>
             `;
-            
+
             // Top produtos
             const vendas = {};
             filtrarPorPeriodo(dados.pedidos).forEach(pedido => {
                 pedido.itens.forEach(item => {
-                    if (!vendas[item.produtoId]) vendas[item.produtoId] = 0;
-                    vendas[item.produtoId] += item.quantidade;
+                    vendas[item.produtoId] = (vendas[item.produtoId] || 0) + item.quantidade;
                 });
             });
-            
-            const topProdutos = Object.entries(vendas)
-                .sort(([,a], [,b]) => b - a)
+            const top = Object.entries(vendas)
+                .sort(([, a], [, b]) => b - a)
                 .slice(0, 5)
                 .map(([id, qtd]) => {
                     const produto = dados.produtos.find(p => p.id == id);
                     return { nome: produto?.nome || 'Produto não encontrado', quantidade: qtd };
                 });
-            
-            document.getElementById('topProdutos').innerHTML = topProdutos.map(p => 
-                `<div class="flex justify-between py-2">
-                    <span>${p.nome}</span>
-                    <span class="bg-gray-100 px-2 py-1 rounded text-sm">${p.quantidade} vendas</span>
-                </div>`
-            ).join('');
+            document.getElementById('topProdutos').innerHTML = top.length
+                ? top.map(p => `
+                    <div class="flex justify-between py-2">
+                        <span>${esc(p.nome)}</span>
+                        <span class="bg-gray-100 px-2 py-1 rounded text-sm">${p.quantidade} vendas</span>
+                    </div>`).join('')
+                : '<p class="text-gray-500 text-center py-4">Nenhum pedido no período</p>';
         }
 
-        // Atualizar produtos por categoria para pedidos
+        // ================= PEDIDOS =================
         function atualizarProdutosPorCategoria() {
             let html = '';
             dados.configuracoes.categorias.forEach(categoria => {
                 const produtos = dados.produtos.filter(p => p.categoria === categoria);
                 if (produtos.length === 0) return;
-                
                 html += `
                     <div class="mb-4">
-                        <h5 class="font-medium text-sm text-gray-700 mb-2">${categoria}:</h5>
+                        <h5 class="font-medium text-sm text-gray-700 mb-2">${esc(categoria)}:</h5>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                             ${produtos.map(produto => `
                                 <div class="flex items-center gap-2 p-3 border rounded-lg">
                                     <div class="flex-1">
-                                        <p class="font-medium text-sm">${produto.nome}</p>
+                                        <p class="font-medium text-sm">${esc(produto.nome)}</p>
                                         <p class="text-sm text-green-600 font-semibold">${formatarMoeda(produto.preco)}</p>
                                     </div>
-                                    <input type="number" min="1" placeholder="Qtd" class="w-16 px-2 py-1 border rounded text-center" 
-                                           onkeypress="if(event.key==='Enter') adicionarItemPedido(${produto.id}, this.value)">
-                                    <button onclick="adicionarItemPedido(${produto.id}, this.previousElementSibling.value)" 
+                                    <input type="number" min="1" placeholder="Qtd" class="w-16 px-2 py-1 border rounded text-center"
+                                           onkeypress="if(event.key==='Enter') adicionarItemPedido(${produto.id}, this)">
+                                    <button onclick="adicionarItemPedido(${produto.id}, this.previousElementSibling)"
                                             class="p-1 bg-orange-600 text-white rounded hover:bg-orange-700">➕</button>
                                 </div>
                             `).join('')}
@@ -758,46 +785,37 @@
             document.getElementById('produtosPorCategoria').innerHTML = html;
         }
 
-        // Adicionar item ao pedido
-        function adicionarItemPedido(produtoId, quantidade) {
-            const qtd = parseInt(quantidade);
+        function adicionarItemPedido(produtoId, input) {
+            const qtd = parseInt(input.value);
             if (!qtd || qtd <= 0) return;
-            
             const produto = dados.produtos.find(p => p.id == produtoId);
             if (!produto) return;
-            
-            const item = {
-                produtoId: produtoId,
+
+            dados.pedidoAtual.itens.push({
+                produtoId: produto.id,
                 nome: produto.nome,
                 quantidade: qtd,
                 precoUnitario: produto.preco,
+                custoUnitario: produto.custo,
                 subtotal: produto.preco * qtd
-            };
-            
-            dados.pedidoAtual.itens.push(item);
-            dados.pedidoAtual.total = dados.pedidoAtual.itens.reduce((total, item) => total + item.subtotal, 0);
-            
+            });
+            dados.pedidoAtual.total = dados.pedidoAtual.itens.reduce((t, i) => t + i.subtotal, 0);
             atualizarItensPedido();
-            
-            // Limpar campo quantidade
-            event.target.previousElementSibling.value = '';
+            input.value = '';
         }
 
-        // Atualizar itens do pedido atual
         function atualizarItensPedido() {
             const container = document.getElementById('itensPedido');
             const lista = document.getElementById('listaItensPedido');
-            
             if (dados.pedidoAtual.itens.length === 0) {
                 container.style.display = 'none';
                 return;
             }
-            
             container.style.display = 'block';
             lista.innerHTML = dados.pedidoAtual.itens.map((item, index) => `
                 <div class="flex justify-between items-center py-2 border-b">
                     <div class="flex-1">
-                        <span class="font-medium">${item.nome}</span>
+                        <span class="font-medium">${esc(item.nome)}</span>
                         <span class="text-gray-500 ml-2">x ${item.quantidade}</span>
                     </div>
                     <div class="flex items-center gap-2">
@@ -806,31 +824,23 @@
                     </div>
                 </div>
             `).join('');
-            
             document.getElementById('totalPedido').textContent = formatarMoeda(dados.pedidoAtual.total);
         }
 
-        // Remover item do pedido
         function removerItemPedido(index) {
             dados.pedidoAtual.itens.splice(index, 1);
-            dados.pedidoAtual.total = dados.pedidoAtual.itens.reduce((total, item) => total + item.subtotal, 0);
+            dados.pedidoAtual.total = dados.pedidoAtual.itens.reduce((t, i) => t + i.subtotal, 0);
             atualizarItensPedido();
         }
 
-        // Finalizar pedido
         function finalizarPedido() {
             const cliente = document.getElementById('nomeCliente').value.trim();
-            if (!cliente) {
-                alert('Digite o nome do cliente!');
-                return;
-            }
-            
-            if (dados.pedidoAtual.itens.length === 0) {
-                alert('Adicione pelo menos um item ao pedido!');
-                return;
-            }
-            
-            const pedido = {
+            if (!cliente) { alert('Digite o nome do cliente!'); return; }
+            if (dados.pedidoAtual.itens.length === 0) { alert('Adicione pelo menos um item ao pedido!'); return; }
+
+            const formaPagamento = document.getElementById('formaPagamentoPedido').value;
+
+            dados.pedidos.push({
                 id: Date.now(),
                 data: document.getElementById('dataPedido').value,
                 hora: document.getElementById('horaPedido').value,
@@ -838,36 +848,56 @@
                 telefone: document.getElementById('telefoneCliente').value,
                 endereco: document.getElementById('enderecoCliente').value,
                 observacoes: document.getElementById('observacoesPedido').value,
+                formaPagamento: formaPagamento,
                 itens: [...dados.pedidoAtual.itens],
                 total: dados.pedidoAtual.total
-            };
-            
-            dados.pedidos.push(pedido);
+            });
             dados.pedidoAtual = { itens: [], total: 0 };
-            
-            // Limpar formulário
+
             document.getElementById('nomeCliente').value = '';
             document.getElementById('telefoneCliente').value = '';
             document.getElementById('enderecoCliente').value = '';
             document.getElementById('observacoesPedido').value = '';
+            document.getElementById('formaPagamentoPedido').value = 'Devedor';
             atualizarItensPedido();
-            
+
             salvarDados();
-            alert('Pedido finalizado com sucesso!');
+            if (formaPagamento === 'Devedor') {
+                alert('Pedido registrado como DEVEDOR.\nEle só entra na receita quando for marcado como pago.');
+            } else {
+                alert('Pedido finalizado com sucesso!');
+            }
             atualizarListaPedidos();
         }
 
-        // Atualizar pedidos
         function atualizarPedidos() {
             atualizarProdutosPorCategoria();
+            atualizarItensPedido();
             atualizarListaPedidos();
         }
 
-        // Atualizar lista de pedidos
+        function getIconePagamento(forma) {
+            const mapa = {
+                'Devedor': { icone: '🔴', classe: 'bg-red-100 text-red-800' },
+                'Dinheiro': { icone: '💵', classe: 'bg-green-100 text-green-800' },
+                'PIX': { icone: '📱', classe: 'bg-blue-100 text-blue-800' },
+                'Cartão': { icone: '💳', classe: 'bg-purple-100 text-purple-800' }
+            };
+            return mapa[forma] || mapa['Dinheiro'];
+        }
+
         function atualizarListaPedidos() {
-            const pedidosFiltrados = filtrarPorPeriodo(dados.pedidos).sort((a, b) => new Date(b.data + 'T' + (b.hora || '00:00')) - new Date(a.data + 'T' + (a.hora || '00:00')));
-            
-            document.getElementById('listaPedidos').innerHTML = pedidosFiltrados.map(pedido => `
+            let pedidos = filtrarPorPeriodo(dados.pedidos);
+            const filtro = document.getElementById('filtroPagamento').value;
+            if (filtro === 'pagos') pedidos = pedidos.filter(p => p.formaPagamento !== 'Devedor');
+            else if (filtro !== 'todos') pedidos = pedidos.filter(p => p.formaPagamento === filtro);
+
+            pedidos.sort((a, b) => new Date(b.data + 'T' + (b.hora || '00:00')) - new Date(a.data + 'T' + (a.hora || '00:00')));
+
+            document.getElementById('listaPedidos').innerHTML = pedidos.map(pedido => {
+                const ic = getIconePagamento(pedido.formaPagamento);
+                const devedor = pedido.formaPagamento === 'Devedor';
+                return `
                 <tr class="border-b hover:bg-gray-50" id="pedido-${pedido.id}">
                     <td class="py-3 px-2">
                         <div class="pedido-data-${pedido.id}">${formatarData(pedido.data)} ${pedido.hora || ''}</div>
@@ -878,24 +908,35 @@
                     </td>
                     <td class="py-3 px-2">
                         <div class="pedido-cliente-${pedido.id}">
-                            <div class="font-medium">${pedido.cliente}</div>
-                            ${pedido.endereco ? `<div class="text-xs text-gray-500">${pedido.endereco}</div>` : ''}
+                            <div class="font-medium">${esc(pedido.cliente)}</div>
+                            ${pedido.endereco ? `<div class="text-xs text-gray-500">${esc(pedido.endereco)}</div>` : ''}
                         </div>
                         <div class="pedido-cliente-edit-${pedido.id}" style="display: none;">
-                            <input type="text" class="pedido-cliente-input-${pedido.id} px-2 py-1 border rounded w-full text-sm mb-1" 
-                                   value="${pedido.cliente}" placeholder="Nome do cliente">
-                            <input type="text" class="pedido-endereco-input-${pedido.id} px-2 py-1 border rounded w-full text-sm" 
-                                   value="${pedido.endereco || ''}" placeholder="Endereço">
+                            <input type="text" class="pedido-cliente-input-${pedido.id} px-2 py-1 border rounded w-full text-sm mb-1"
+                                   value="${esc(pedido.cliente)}" placeholder="Nome do cliente">
+                            <input type="text" class="pedido-endereco-input-${pedido.id} px-2 py-1 border rounded w-full text-sm"
+                                   value="${esc(pedido.endereco || '')}" placeholder="Endereço">
                         </div>
                     </td>
                     <td class="py-3 px-2">
-                        <span class="pedido-telefone-${pedido.id}">${pedido.telefone || '-'}</span>
-                        <input type="tel" class="pedido-telefone-edit-${pedido.id} px-2 py-1 border rounded w-full text-sm" 
-                               value="${pedido.telefone || ''}" style="display: none;">
+                        <span class="pedido-telefone-${pedido.id}">${esc(pedido.telefone) || '-'}</span>
+                        <input type="tel" class="pedido-telefone-edit-${pedido.id} px-2 py-1 border rounded w-full text-sm"
+                               value="${esc(pedido.telefone || '')}" style="display: none;">
+                    </td>
+                    <td class="py-3 px-2">
+                        <span class="pedido-pagamento-${pedido.id}">
+                            <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium ${ic.classe}">${ic.icone} ${pedido.formaPagamento}</span>
+                        </span>
+                        <select class="pedido-pagamento-edit-${pedido.id} px-2 py-1 border rounded w-full text-sm" style="display: none;">
+                            <option value="Devedor" ${pedido.formaPagamento === 'Devedor' ? 'selected' : ''}>🔴 Devedor</option>
+                            <option value="Dinheiro" ${pedido.formaPagamento === 'Dinheiro' ? 'selected' : ''}>💵 Dinheiro</option>
+                            <option value="PIX" ${pedido.formaPagamento === 'PIX' ? 'selected' : ''}>📱 PIX</option>
+                            <option value="Cartão" ${pedido.formaPagamento === 'Cartão' ? 'selected' : ''}>💳 Cartão</option>
+                        </select>
                     </td>
                     <td class="py-3 px-2 text-sm">
                         <div class="pedido-itens-${pedido.id}">
-                            ${pedido.itens.map(item => `${item.nome} (${item.quantidade})`).join(', ')}
+                            ${pedido.itens.map(item => `${esc(item.nome)} (${item.quantidade})`).join(', ')}
                         </div>
                         <div class="pedido-itens-edit-${pedido.id}" style="display: none;">
                             <button onclick="editarItensPedido(${pedido.id})" class="text-blue-600 hover:bg-blue-100 px-2 py-1 rounded text-xs">
@@ -903,194 +944,304 @@
                             </button>
                         </div>
                     </td>
-                    <td class="py-3 px-2 text-right font-semibold text-green-600">
+                    <td class="py-3 px-2 text-right font-semibold ${devedor ? 'text-yellow-600' : 'text-green-600'}">
                         <span class="pedido-total-${pedido.id}">${formatarMoeda(pedido.total)}</span>
                     </td>
                     <td class="py-3 px-2 text-center">
                         <div class="flex gap-1 justify-center">
+                            ${devedor ? `<button onclick="receberPagamento(${pedido.id})" class="text-green-600 hover:bg-green-100 p-1 rounded" title="Receber pagamento">💰</button>` : ''}
                             <button onclick="editarPedido(${pedido.id})" class="pedido-btn-edit-${pedido.id} text-blue-600 hover:bg-blue-100 p-1 rounded" title="Editar">✏️</button>
                             <button onclick="salvarPedido(${pedido.id})" class="pedido-btn-save-${pedido.id} text-green-600 hover:bg-green-100 p-1 rounded" title="Salvar" style="display: none;">💾</button>
-                            <button onclick="cancelarEdicaoPedido(${pedido.id})" class="pedido-btn-cancel-${pedido.id} text-gray-600 hover:bg-gray-100 p-1 rounded" title="Cancelar" style="display: none;">❌</button>
+                            <button onclick="cancelarEdicaoPedido(${pedido.id})" class="pedido-btn-cancel-${pedido.id} text-gray-600 hover:bg-gray-100 p-1 rounded" title="Cancelar" style="display: none;">✖</button>
                             <button onclick="excluirPedido(${pedido.id})" class="text-red-600 hover:bg-red-100 p-1 rounded" title="Excluir">🗑️</button>
                         </div>
                     </td>
-                </tr>
+                </tr>`;
+            }).join('');
+        }
+
+        // Receber pagamento de um pedido devedor
+        function receberPagamento(id) {
+            const p = dados.pedidos.find(x => x.id === id);
+            if (!p) return;
+            const m = document.createElement('div');
+            m.id = 'modalReceber';
+            m.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            m.innerHTML = `
+                <div class="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full mx-4">
+                    <h3 class="text-lg font-semibold mb-1">💰 Receber pagamento</h3>
+                    <p class="text-sm text-gray-600 mb-4">${esc(p.cliente)} — ${formatarMoeda(p.total)}</p>
+                    <div class="grid grid-cols-3 gap-2 mb-3">
+                        <button onclick="confirmarRecebimento(${id}, 'Dinheiro')" class="bg-green-600 text-white px-2 py-2 rounded hover:bg-green-700 text-sm">💵 Dinheiro</button>
+                        <button onclick="confirmarRecebimento(${id}, 'PIX')" class="bg-blue-600 text-white px-2 py-2 rounded hover:bg-blue-700 text-sm">📱 PIX</button>
+                        <button onclick="confirmarRecebimento(${id}, 'Cartão')" class="bg-purple-600 text-white px-2 py-2 rounded hover:bg-purple-700 text-sm">💳 Cartão</button>
+                    </div>
+                    <button onclick="fecharModal('modalReceber')" class="w-full bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">✖ Cancelar</button>
+                </div>
+            `;
+            document.body.appendChild(m);
+        }
+
+        function confirmarRecebimento(id, forma) {
+            const p = dados.pedidos.find(x => x.id === id);
+            if (p) p.formaPagamento = forma;
+            salvarDados();
+            fecharModal('modalReceber');
+            atualizarAba(abaAtiva());
+        }
+
+        // --- Edição de pedidos ---
+        function editarPedido(id) {
+            ['data', 'cliente', 'telefone', 'pagamento', 'itens'].forEach(campo => {
+                document.querySelector(`.pedido-${campo}-${id}`).style.display = 'none';
+                document.querySelector(`.pedido-${campo}-edit-${id}`).style.display = 'block';
+            });
+            document.querySelector(`.pedido-btn-edit-${id}`).style.display = 'none';
+            document.querySelector(`.pedido-btn-save-${id}`).style.display = 'inline-block';
+            document.querySelector(`.pedido-btn-cancel-${id}`).style.display = 'inline-block';
+        }
+
+        function salvarPedido(id) {
+            const novaData = document.querySelector(`.pedido-data-input-${id}`).value;
+            const novaHora = document.querySelector(`.pedido-hora-input-${id}`).value;
+            const novoCliente = document.querySelector(`.pedido-cliente-input-${id}`).value.trim();
+            const novoEndereco = document.querySelector(`.pedido-endereco-input-${id}`).value.trim();
+            const novoTelefone = document.querySelector(`.pedido-telefone-edit-${id}`).value.trim();
+            const novoPagamento = document.querySelector(`.pedido-pagamento-edit-${id}`).value;
+
+            if (!novoCliente) { alert('O nome do cliente não pode estar vazio!'); return; }
+
+            const pedido = dados.pedidos.find(p => p.id === id);
+            if (pedido) {
+                pedido.data = novaData;
+                pedido.hora = novaHora;
+                pedido.cliente = novoCliente;
+                pedido.endereco = novoEndereco;
+                pedido.telefone = novoTelefone;
+                pedido.formaPagamento = novoPagamento;
+            }
+            salvarDados();
+            atualizarListaPedidos();
+            alert('Pedido atualizado com sucesso!');
+        }
+
+        function cancelarEdicaoPedido() { atualizarListaPedidos(); }
+
+        function excluirPedido(id) {
+            if (confirm('Tem certeza que deseja excluir este pedido?')) {
+                dados.pedidos = dados.pedidos.filter(p => p.id !== id);
+                salvarDados();
+                atualizarListaPedidos();
+            }
+        }
+
+        // --- Edição de itens do pedido (trabalha em cópia; "Cancelar" não altera nada) ---
+        function linhasItensModal() {
+            return window.pedidoEditandoItens.itens.map((item, index) => `
+                <div class="flex items-center gap-2 p-2 bg-gray-50 rounded" data-index="${index}">
+                    <span class="flex-1">${esc(item.nome)}</span>
+                    <input type="number" min="1" value="${item.quantidade}"
+                           class="w-16 px-2 py-1 border rounded text-center quantidade-item"
+                           onchange="atualizarQuantidadeItem(this, ${index})">
+                    <span class="w-20 text-right">${formatarMoeda(item.precoUnitario)}</span>
+                    <span class="w-20 text-right font-semibold subtotal-item">${formatarMoeda(item.subtotal)}</span>
+                    <button onclick="removerItemPedidoModal(${index})" class="text-red-600 hover:bg-red-100 p-1 rounded">🗑️</button>
+                </div>
             `).join('');
         }
 
-        // === PRECIFICAÇÃO ===
-        
-        // Adicionar ingrediente
+        function editarItensPedido(id) {
+            const pedido = dados.pedidos.find(p => p.id === id);
+            if (!pedido) return;
+            window.pedidoEditandoItens = JSON.parse(JSON.stringify(pedido));
+
+            const modal = document.createElement('div');
+            modal.id = 'modalItens';
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-white p-6 rounded-lg shadow-lg max-w-4xl w-full mx-4 max-h-screen overflow-y-auto">
+                    <h3 class="text-lg font-semibold mb-4">✏️ Editar Itens - ${esc(pedido.cliente)}</h3>
+                    <div class="mb-4">
+                        <h4 class="font-medium mb-2">Itens Atuais:</h4>
+                        <div id="itensAtuaisPedido" class="space-y-2">${linhasItensModal()}</div>
+                    </div>
+                    <div class="mb-4">
+                        <h4 class="font-medium mb-2">Adicionar Novo Item:</h4>
+                        <div class="flex gap-2">
+                            <select id="novoProdutoModal" class="flex-1 px-3 py-2 border rounded">
+                                <option value="">Selecionar produto</option>
+                                ${dados.produtos.map(p => `<option value="${p.id}">${esc(p.nome)} - ${formatarMoeda(p.preco)}</option>`).join('')}
+                            </select>
+                            <input type="number" id="novaQuantidadeModal" min="1" placeholder="Qtd" class="w-20 px-2 py-2 border rounded text-center">
+                            <button onclick="adicionarItemModal()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">➕</button>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center p-3 bg-green-50 rounded mb-4">
+                        <span class="font-bold">Total:</span>
+                        <span id="totalPedidoModal" class="font-bold text-green-600">${formatarMoeda(pedido.total)}</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="salvarItensPedido(${id})" class="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">💾 Salvar Alterações</button>
+                        <button onclick="fecharModalItens()" class="flex-1 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">✖ Cancelar</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function atualizarQuantidadeItem(input, index) {
+            const item = window.pedidoEditandoItens.itens[index];
+            item.quantidade = parseInt(input.value) || 1;
+            item.subtotal = item.precoUnitario * item.quantidade;
+            input.closest('[data-index]').querySelector('.subtotal-item').textContent = formatarMoeda(item.subtotal);
+            atualizarTotalModal();
+        }
+
+        function removerItemPedidoModal(index) {
+            window.pedidoEditandoItens.itens.splice(index, 1);
+            document.getElementById('itensAtuaisPedido').innerHTML = linhasItensModal();
+            atualizarTotalModal();
+        }
+
+        function adicionarItemModal() {
+            const produtoId = document.getElementById('novoProdutoModal').value;
+            const quantidade = parseInt(document.getElementById('novaQuantidadeModal').value);
+            if (!produtoId || !quantidade || quantidade <= 0) { alert('Selecione um produto e quantidade válida!'); return; }
+            const produto = dados.produtos.find(p => p.id == produtoId);
+            if (!produto) return;
+
+            window.pedidoEditandoItens.itens.push({
+                produtoId: produto.id,
+                nome: produto.nome,
+                quantidade: quantidade,
+                precoUnitario: produto.preco,
+                custoUnitario: produto.custo,
+                subtotal: produto.preco * quantidade
+            });
+            document.getElementById('novoProdutoModal').value = '';
+            document.getElementById('novaQuantidadeModal').value = '';
+            document.getElementById('itensAtuaisPedido').innerHTML = linhasItensModal();
+            atualizarTotalModal();
+        }
+
+        function atualizarTotalModal() {
+            const total = window.pedidoEditandoItens.itens.reduce((s, i) => s + i.subtotal, 0);
+            window.pedidoEditandoItens.total = total;
+            document.getElementById('totalPedidoModal').textContent = formatarMoeda(total);
+        }
+
+        function salvarItensPedido(id) {
+            if (window.pedidoEditandoItens.itens.length === 0) { alert('O pedido deve ter pelo menos um item!'); return; }
+            const real = dados.pedidos.find(p => p.id === id);
+            if (real) {
+                real.itens = window.pedidoEditandoItens.itens;
+                real.total = window.pedidoEditandoItens.total;
+            }
+            salvarDados();
+            fecharModalItens();
+            atualizarListaPedidos();
+            alert('Itens do pedido atualizados com sucesso!');
+        }
+
+        function fecharModalItens() {
+            fecharModal('modalItens');
+            window.pedidoEditandoItens = null;
+        }
+
+        // ================= DRAG & DROP (sem biblioteca externa) =================
+        function Sortable(el, options) {
+            if (el._sortable) return;
+            el._sortable = true;
+            let dragEl = null, dragStartIndex = 0;
+
+            el.addEventListener('dragstart', function (e) {
+                dragEl = e.target.closest('tr');
+                if (!dragEl) return;
+                dragStartIndex = Array.from(el.children).indexOf(dragEl);
+                dragEl.style.opacity = '0.5';
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            el.addEventListener('dragover', function (e) {
+                e.preventDefault();
+                if (!dragEl) return;
+                e.dataTransfer.dropEffect = 'move';
+                const after = getDragAfterElement(el, e.clientY);
+                if (after == null) el.appendChild(dragEl);
+                else el.insertBefore(dragEl, after);
+            });
+            el.addEventListener('dragend', function () {
+                if (!dragEl) return;
+                dragEl.style.opacity = '';
+                const newIndex = Array.from(el.children).indexOf(dragEl);
+                dragEl = null;
+                if (options.onEnd) options.onEnd({ oldIndex: dragStartIndex, newIndex: newIndex });
+            });
+        }
+
+        function getDragAfterElement(container, y) {
+            const els = [...container.querySelectorAll('tr')].filter(r => r.style.opacity !== '0.5');
+            return els.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                if (offset < 0 && offset > closest.offset) return { offset, element: child };
+                return closest;
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        function inicializarDragDrop() {
+            const listaIng = document.getElementById('listaIngredientes');
+            if (listaIng) Sortable(listaIng, { onEnd: e => reordenarIngredientes(e.oldIndex, e.newIndex) });
+            const ingRec = document.getElementById('ingredientesReceita');
+            if (ingRec) Sortable(ingRec, { onEnd: e => reordenarIngredientesReceita(e.oldIndex, e.newIndex) });
+        }
+
+        function inicializarDragDropReceitas() {
+            const corpo = document.getElementById('corpoTabelaReceitas');
+            if (corpo) Sortable(corpo, { onEnd: e => reordenarReceitas(e.oldIndex, e.newIndex) });
+        }
+
+        function reordenarIngredientes(oldIndex, newIndex) {
+            if (oldIndex === newIndex) return;
+            const item = dados.ingredientes.splice(oldIndex, 1)[0];
+            dados.ingredientes.splice(newIndex, 0, item);
+            salvarDados();
+            atualizarSelectIngredientes();
+        }
+
+        function reordenarIngredientesReceita(oldIndex, newIndex) {
+            if (!dados.receitaAtual || oldIndex === newIndex) return;
+            const item = dados.receitaAtual.ingredientes.splice(oldIndex, 1)[0];
+            dados.receitaAtual.ingredientes.splice(newIndex, 0, item);
+            atualizarIngredientesReceita();
+        }
+
+        function reordenarReceitas(oldIndex, newIndex) {
+            if (oldIndex === newIndex) return;
+            const item = dados.receitas.splice(oldIndex, 1)[0];
+            dados.receitas.splice(newIndex, 0, item);
+            salvarDados();
+        }
+
+        // ================= PRECIFICAÇÃO: INGREDIENTES =================
         function adicionarIngrediente() {
             const nome = document.getElementById('nomeIngrediente').value.trim();
             const preco = parseFloat(document.getElementById('precoIngrediente').value);
             const quantidade = parseFloat(document.getElementById('quantidadeIngrediente').value);
             const unidade = document.getElementById('unidadeIngrediente').value;
-            
-            if (!nome || !preco || !quantidade) {
-                alert('Preencha todos os campos!');
-                return;
-            }
-            
-            const ingrediente = {
-                id: Date.now(),
-                nome: nome,
-                preco: preco,
-                quantidade: quantidade,
-                unidade: unidade,
-                precoUnidade: preco / quantidade
-            };
-            
-            dados.ingredientes.push(ingrediente);
-            
-            // Limpar formulário
+
+            if (!nome || !preco || !quantidade) { alert('Preencha todos os campos!'); return; }
+
+            dados.ingredientes.push({ id: Date.now(), nome, preco, quantidade, unidade, precoUnidade: preco / quantidade });
+
             document.getElementById('nomeIngrediente').value = '';
             document.getElementById('precoIngrediente').value = '';
             document.getElementById('quantidadeIngrediente').value = '';
-            
+
             salvarDados();
             atualizarListaIngredientes();
             atualizarSelectIngredientes();
         }
-        
-        // === SISTEMA DE DRAG & DROP ===
-        
-        // Inicializar drag & drop
-        function inicializarDragDrop() {
-            // Para ingredientes
-            const listaIngredientes = document.getElementById('listaIngredientes');
-            if (listaIngredientes) {
-                new Sortable(listaIngredientes, {
-                    animation: 150,
-                    handle: '.drag-handle',
-                    onEnd: function(evt) {
-                        reordenarIngredientes(evt.oldIndex, evt.newIndex);
-                    }
-                });
-            }
-            
-            // Para receitas
-            const ingredientesReceita = document.getElementById('ingredientesReceita');
-            if (ingredientesReceita) {
-                new Sortable(ingredientesReceita, {
-                    animation: 150,
-                    handle: '.drag-handle-receita',
-                    onEnd: function(evt) {
-                        reordenarIngredientesReceita(evt.oldIndex, evt.newIndex);
-                    }
-                });
-            }
-        }
-        
-        // Inicializar drag & drop para receitas
-        function inicializarDragDropReceitas() {
-            const corpoTabela = document.getElementById('corpoTabelaReceitas');
-            if (corpoTabela) {
-                new Sortable(corpoTabela, {
-                    animation: 150,
-                    handle: '.drag-handle-receitas',
-                    onEnd: function(evt) {
-                        reordenarReceitas(evt.oldIndex, evt.newIndex);
-                    }
-                });
-            }
-        }
-        
-        // Reordenar ingredientes
-        function reordenarIngredientes(oldIndex, newIndex) {
-            if (oldIndex === newIndex) return;
-            
-            const item = dados.ingredientes.splice(oldIndex, 1)[0];
-            dados.ingredientes.splice(newIndex, 0, item);
-            
-            salvarDados();
-            atualizarSelectIngredientes();
-        }
-        
-        // Reordenar ingredientes da receita
-        function reordenarIngredientesReceita(oldIndex, newIndex) {
-            if (!dados.receitaAtual || oldIndex === newIndex) return;
-            
-            const item = dados.receitaAtual.ingredientes.splice(oldIndex, 1)[0];
-            dados.receitaAtual.ingredientes.splice(newIndex, 0, item);
-            
-            atualizarIngredientesReceita();
-        }
-        
-        // Reordenar receitas
-        function reordenarReceitas(oldIndex, newIndex) {
-            if (oldIndex === newIndex) return;
-            
-            const item = dados.receitas.splice(oldIndex, 1)[0];
-            dados.receitas.splice(newIndex, 0, item);
-            
-            salvarDados();
-            // Não precisa atualizar a lista pois o DOM já foi movido
-        }
-        
-        // Implementação de Sortable simples (sem biblioteca externa)
-        function Sortable(el, options) {
-            let dragEl = null;
-            let nextEl = null;
-            let dragStartIndex = 0;
-            
-            el.addEventListener('dragstart', function(e) {
-                dragEl = e.target.closest('tr');
-                if (!dragEl) return;
-                
-                dragStartIndex = Array.from(el.children).indexOf(dragEl);
-                dragEl.style.opacity = '0.5';
-                e.dataTransfer.effectAllowed = 'move';
-            });
-            
-            el.addEventListener('dragover', function(e) {
-                if (e.preventDefault) e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                
-                const afterElement = getDragAfterElement(el, e.clientY);
-                if (afterElement == null) {
-                    el.appendChild(dragEl);
-                } else {
-                    el.insertBefore(dragEl, afterElement);
-                }
-            });
-            
-            el.addEventListener('dragend', function(e) {
-                if (dragEl) {
-                    dragEl.style.opacity = '';
-                    const newIndex = Array.from(el.children).indexOf(dragEl);
-                    
-                    if (options.onEnd) {
-                        options.onEnd({
-                            oldIndex: dragStartIndex,
-                            newIndex: newIndex
-                        });
-                    }
-                    
-                    dragEl = null;
-                }
-            });
-        }
-        
-        // Encontrar elemento após o cursor
-        function getDragAfterElement(container, y) {
-            const draggableElements = [...container.querySelectorAll('tr:not(.dragging)')];
-            
-            return draggableElements.reduce((closest, child) => {
-                const box = child.getBoundingClientRect();
-                const offset = y - box.top - box.height / 2;
-                
-                if (offset < 0 && offset > closest.offset) {
-                    return { offset: offset, element: child };
-                } else {
-                    return closest;
-                }
-            }, { offset: Number.NEGATIVE_INFINITY }).element;
-        }
-        
-        // === FIM DRAG & DROP ===
 
-        // Atualizar lista de ingredientes com drag handles
         function atualizarListaIngredientes() {
             document.getElementById('listaIngredientes').innerHTML = dados.ingredientes.map(ing => `
                 <tr class="border-b hover:bg-gray-50" id="ingrediente-${ing.id}" draggable="true">
@@ -1098,18 +1249,18 @@
                         <span class="drag-handle cursor-move text-gray-400 hover:text-gray-600" title="Arrastar para reordenar">⋮⋮</span>
                     </td>
                     <td class="py-3 px-2 font-medium">
-                        <span class="ingrediente-nome">${ing.nome}</span>
-                        <input type="text" class="ingrediente-nome-edit px-2 py-1 border rounded w-full" value="${ing.nome}" 
+                        <span class="ingrediente-nome">${esc(ing.nome)}</span>
+                        <input type="text" class="ingrediente-nome-edit px-2 py-1 border rounded w-full" value="${esc(ing.nome)}"
                                onkeypress="if(event.key==='Enter') salvarIngrediente(${ing.id})" style="display: none;">
                     </td>
                     <td class="py-3 px-2 text-right">
                         <span class="ingrediente-preco">${formatarMoeda(ing.preco)}</span>
-                        <input type="number" step="0.01" class="ingrediente-preco-edit px-2 py-1 border rounded w-20 text-right" value="${ing.preco}" 
+                        <input type="number" step="0.01" class="ingrediente-preco-edit px-2 py-1 border rounded w-20 text-right" value="${ing.preco}"
                                onkeypress="if(event.key==='Enter') salvarIngrediente(${ing.id})" style="display: none;">
                     </td>
                     <td class="py-3 px-2 text-right">
                         <span class="ingrediente-quantidade">${ing.quantidade}</span>
-                        <input type="number" step="0.01" class="ingrediente-quantidade-edit px-2 py-1 border rounded w-16 text-right" value="${ing.quantidade}" 
+                        <input type="number" step="0.01" class="ingrediente-quantidade-edit px-2 py-1 border rounded w-16 text-right" value="${ing.quantidade}"
                                onkeypress="if(event.key==='Enter') salvarIngrediente(${ing.id})" style="display: none;">
                     </td>
                     <td class="py-3 px-2">
@@ -1129,117 +1280,83 @@
                         <div class="flex gap-1 justify-center">
                             <button onclick="editarIngrediente(${ing.id})" class="ingrediente-btn-editar text-blue-600 hover:bg-blue-100 p-1 rounded" title="Editar">✏️</button>
                             <button onclick="salvarIngrediente(${ing.id})" class="ingrediente-btn-salvar text-green-600 hover:bg-green-100 p-1 rounded" title="Salvar" style="display: none;">💾</button>
-                            <button onclick="cancelarEdicaoIngrediente(${ing.id})" class="ingrediente-btn-cancelar text-gray-600 hover:bg-gray-100 p-1 rounded" title="Cancelar" style="display: none;">❌</button>
+                            <button onclick="cancelarEdicaoIngrediente(${ing.id})" class="ingrediente-btn-cancelar text-gray-600 hover:bg-gray-100 p-1 rounded" title="Cancelar" style="display: none;">✖</button>
                             <button onclick="excluirIngrediente(${ing.id})" class="ingrediente-btn-excluir text-red-600 hover:bg-red-100 p-1 rounded" title="Excluir">🗑️</button>
                         </div>
                     </td>
                 </tr>
             `).join('');
-            
-            // Reinicializar drag & drop
-            setTimeout(inicializarDragDrop, 100);
+            inicializarDragDrop();
         }
-        
-        // Editar ingrediente
+
         function editarIngrediente(id) {
             const row = document.getElementById(`ingrediente-${id}`);
-            
-            // Esconder spans e mostrar inputs
-            row.querySelectorAll('span').forEach(span => {
-                if (span.classList.contains('ingrediente-nome') || 
-                    span.classList.contains('ingrediente-preco') || 
-                    span.classList.contains('ingrediente-quantidade') || 
-                    span.classList.contains('ingrediente-unidade')) {
-                    span.style.display = 'none';
-                }
-            });
-            
-            row.querySelectorAll('.ingrediente-nome-edit, .ingrediente-preco-edit, .ingrediente-quantidade-edit, .ingrediente-unidade-edit').forEach(input => {
-                input.style.display = 'block';
-            });
-            
-            // Trocar botões
+            row.querySelectorAll('.ingrediente-nome, .ingrediente-preco, .ingrediente-quantidade, .ingrediente-unidade')
+                .forEach(s => s.style.display = 'none');
+            row.querySelectorAll('.ingrediente-nome-edit, .ingrediente-preco-edit, .ingrediente-quantidade-edit, .ingrediente-unidade-edit')
+                .forEach(i => i.style.display = 'block');
             row.querySelector('.ingrediente-btn-editar').style.display = 'none';
             row.querySelector('.ingrediente-btn-excluir').style.display = 'none';
             row.querySelector('.ingrediente-btn-salvar').style.display = 'inline-block';
             row.querySelector('.ingrediente-btn-cancelar').style.display = 'inline-block';
         }
-        
-        // Salvar ingrediente editado
+
         function salvarIngrediente(id) {
             const row = document.getElementById(`ingrediente-${id}`);
-            
             const novoNome = row.querySelector('.ingrediente-nome-edit').value.trim();
             const novoPreco = parseFloat(row.querySelector('.ingrediente-preco-edit').value);
             const novaQuantidade = parseFloat(row.querySelector('.ingrediente-quantidade-edit').value);
             const novaUnidade = row.querySelector('.ingrediente-unidade-edit').value;
-            
-            if (!novoNome || !novoPreco || !novaQuantidade) {
-                alert('Preencha todos os campos!');
-                return;
+
+            if (!novoNome || !novoPreco || !novaQuantidade) { alert('Preencha todos os campos!'); return; }
+
+            const ing = dados.ingredientes.find(i => i.id === id);
+            if (ing) {
+                ing.nome = novoNome;
+                ing.preco = novoPreco;
+                ing.quantidade = novaQuantidade;
+                ing.unidade = novaUnidade;
+                ing.precoUnidade = novoPreco / novaQuantidade;
             }
-            
-            // Atualizar dados
-            const ingrediente = dados.ingredientes.find(ing => ing.id === id);
-            if (ingrediente) {
-                ingrediente.nome = novoNome;
-                ingrediente.preco = novoPreco;
-                ingrediente.quantidade = novaQuantidade;
-                ingrediente.unidade = novaUnidade;
-                ingrediente.precoUnidade = novoPreco / novaQuantidade;
-            }
-            
+
             salvarDados();
             atualizarListaIngredientes();
             atualizarSelectIngredientes();
-            
-            // Atualizar receitas que usam este ingrediente
             atualizarReceitasComIngrediente(id);
-            
             alert(`Ingrediente "${novoNome}" atualizado com sucesso!`);
         }
-        
-        // Cancelar edição do ingrediente
-        function cancelarEdicaoIngrediente(id) {
-            atualizarListaIngredientes();
-        }
-        
-        // Atualizar receitas que usam um ingrediente modificado
+
+        function cancelarEdicaoIngrediente() { atualizarListaIngredientes(); }
+
+        // Atualiza CUSTOS das receitas que usam o ingrediente. O preço de venda NÃO é alterado.
         function atualizarReceitasComIngrediente(ingredienteId) {
-            const ingrediente = dados.ingredientes.find(ing => ing.id === ingredienteId);
-            if (!ingrediente) return;
-            
-            let receitasAtualizadas = 0;
-            
+            const ing = dados.ingredientes.find(i => i.id === ingredienteId);
+            if (!ing) return;
+            let afetadas = 0;
+
             dados.receitas.forEach(receita => {
-                receita.ingredientes.forEach(ingReceita => {
-                    if (ingReceita.ingredienteId === ingredienteId) {
-                        ingReceita.nome = ingrediente.nome;
-                        ingReceita.unidade = ingrediente.unidade;
-                        ingReceita.custoUnitario = ingrediente.precoUnidade;
-                        ingReceita.custoTotal = ingrediente.precoUnidade * ingReceita.quantidade;
-                        receitasAtualizadas++;
+                receita.ingredientes.forEach(ir => {
+                    if (ir.ingredienteId === ingredienteId) {
+                        ir.nome = ing.nome;
+                        ir.unidade = ing.unidade;
+                        ir.custoUnitario = ing.precoUnidade;
+                        ir.custoTotal = ing.precoUnidade * ir.quantidade;
+                        afetadas++;
                     }
                 });
-                
-                // Recalcular custo total da receita
-                receita.custoTotal = receita.ingredientes.reduce((total, ing) => total + ing.custoTotal, 0);
+                receita.custoTotal = receita.ingredientes.reduce((t, i) => t + i.custoTotal, 0);
             });
-            
-            if (receitasAtualizadas > 0) {
+
+            if (afetadas > 0) {
                 salvarDados();
                 atualizarListaReceitas();
-                
-                // Se estamos editando uma receita, atualizar a visualização
-                if (dados.receitaAtual) {
-                    atualizarIngredientesReceita();
-                }
+                if (dados.receitaAtual) atualizarIngredientesReceita();
             }
         }
-        
-        // Função para atualização rápida de preços (Recurso Extra)
+
         function atualizacaoRapidaPrecos() {
             const container = document.createElement('div');
+            container.id = 'modalPrecos';
             container.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
             container.innerHTML = `
                 <div class="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
@@ -1247,103 +1364,82 @@
                     <div class="space-y-3 max-h-60 overflow-y-auto">
                         ${dados.ingredientes.map(ing => `
                             <div class="flex items-center gap-2">
-                                <span class="flex-1 text-sm">${ing.nome}</span>
-                                <input type="number" step="0.01" value="${ing.preco}" 
-                                       class="w-20 px-2 py-1 border rounded text-right text-sm"
-                                       data-id="${ing.id}">
+                                <span class="flex-1 text-sm">${esc(ing.nome)}</span>
+                                <input type="number" step="0.01" value="${ing.preco}"
+                                       class="qp-input w-20 px-2 py-1 border rounded text-right text-sm" data-id="${ing.id}">
                                 <span class="text-xs text-gray-500">/${ing.quantidade}${ing.unidade}</span>
                             </div>
                         `).join('')}
                     </div>
                     <div class="flex gap-2 mt-4">
-                        <button onclick="salvarAtualizacaoRapida()" class="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
-                            💾 Salvar Todos
-                        </button>
-                        <button onclick="fecharAtualizacaoRapida()" class="flex-1 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">
-                            ❌ Cancelar
-                        </button>
+                        <button onclick="salvarAtualizacaoRapida()" class="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">💾 Salvar Todos</button>
+                        <button onclick="fecharAtualizacaoRapida()" class="flex-1 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">✖ Cancelar</button>
                     </div>
                 </div>
             `;
             document.body.appendChild(container);
         }
-        
-        // Salvar atualização rápida
+
         function salvarAtualizacaoRapida() {
-            const inputs = document.querySelectorAll('[data-id]');
             let atualizados = 0;
-            
-            inputs.forEach(input => {
+            document.querySelectorAll('.qp-input').forEach(input => {
                 const id = parseInt(input.dataset.id);
                 const novoPreco = parseFloat(input.value);
-                const ingrediente = dados.ingredientes.find(ing => ing.id === id);
-                
-                if (ingrediente && novoPreco && novoPreco !== ingrediente.preco) {
-                    ingrediente.preco = novoPreco;
-                    ingrediente.precoUnidade = novoPreco / ingrediente.quantidade;
+                const ing = dados.ingredientes.find(i => i.id === id);
+                if (ing && novoPreco && novoPreco !== ing.preco) {
+                    ing.preco = novoPreco;
+                    ing.precoUnidade = novoPreco / ing.quantidade;
                     atualizarReceitasComIngrediente(id);
                     atualizados++;
                 }
             });
-            
             if (atualizados > 0) {
                 salvarDados();
                 atualizarListaIngredientes();
                 atualizarSelectIngredientes();
                 alert(`${atualizados} preços atualizados com sucesso!`);
             }
-            
             fecharAtualizacaoRapida();
         }
-        
-        // Fechar modal de atualização rápida
-        function fecharAtualizacaoRapida() {
-            const modal = document.querySelector('.fixed.inset-0');
-            if (modal) modal.remove();
-        }
-        
-        // Excluir ingrediente
+
+        function fecharAtualizacaoRapida() { fecharModal('modalPrecos'); }
+
         function excluirIngrediente(id) {
             if (confirm('Tem certeza que deseja excluir este ingrediente?')) {
-                dados.ingredientes = dados.ingredientes.filter(ing => ing.id !== id);
+                dados.ingredientes = dados.ingredientes.filter(i => i.id !== id);
                 salvarDados();
                 atualizarListaIngredientes();
                 atualizarSelectIngredientes();
             }
         }
-        
-        // Criar receita
+
+        // ================= PRECIFICAÇÃO: RECEITAS =================
         function criarReceita() {
             const nome = document.getElementById('nomeReceita').value.trim();
             const categoria = document.getElementById('categoriaReceita').value;
-            
-            if (!nome) {
-                alert('Digite o nome do produto!');
-                return;
-            }
-            
-            const receita = {
-                id: Date.now(),
-                nome: nome,
-                categoria: categoria,
-                ingredientes: [],
-                custoTotal: 0
-            };
-            
-            dados.receitas.push(receita);
+            if (!nome) { alert('Digite o nome do produto!'); return; }
+
+            dados.receitas.push({ id: Date.now(), nome, categoria, ingredientes: [], custoTotal: 0 });
             document.getElementById('nomeReceita').value = '';
-            
             salvarDados();
             atualizarListaReceitas();
         }
-        
-        // Atualizar lista de receitas
+
+        function margemRealReceita(r) {
+            if (r.precoVenda > 0 && r.custoTotal > 0) return (1 - r.custoTotal / r.precoVenda) * 100;
+            return null;
+        }
+
+        function classeMargem(m) {
+            return m >= 50 ? 'text-green-600' : m >= 30 ? 'text-yellow-600' : 'text-red-600';
+        }
+
         function atualizarListaReceitas() {
             if (dados.receitas.length === 0) {
                 document.getElementById('listaReceitas').innerHTML = '<p class="text-gray-500 text-center py-4">Nenhuma receita cadastrada</p>';
                 return;
             }
-            
+
             document.getElementById('listaReceitas').innerHTML = `
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
@@ -1353,445 +1449,135 @@
                                 <th class="text-left py-3 px-2">Produto</th>
                                 <th class="text-left py-3 px-2">Categoria</th>
                                 <th class="text-right py-3 px-2">Custo</th>
+                                <th class="text-right py-3 px-2">Preço Venda</th>
                                 <th class="text-right py-3 px-2">Margem</th>
                                 <th class="text-right py-3 px-2">Ingredientes</th>
                                 <th class="text-center py-3 px-2">Ações</th>
                             </tr>
                         </thead>
-                        <tbody id="corpoTabelaReceitas" class="sortable-receitas">
-                            ${dados.receitas.map(receita => `
+                        <tbody id="corpoTabelaReceitas">
+                            ${dados.receitas.map(r => {
+                                const mr = margemRealReceita(r);
+                                const m = mr !== null ? mr : (r.margem || 60);
+                                return `
                                 <tr class="border-b hover:bg-gray-50" draggable="true">
                                     <td class="py-3 px-2">
                                         <span class="drag-handle-receitas cursor-move text-gray-400 hover:text-gray-600" title="Arrastar para reordenar">⋮⋮</span>
                                     </td>
                                     <td class="py-3 px-2 font-medium">
-                                        <span class="receita-nome-${receita.id}">${receita.nome}</span>
-                                        <input type="text" class="receita-nome-edit-${receita.id} px-2 py-1 border rounded w-full" 
-                                               value="${receita.nome}" onkeypress="if(event.key==='Enter') salvarInfoReceita(${receita.id})" style="display: none;">
+                                        <span class="receita-nome-${r.id}">${esc(r.nome)}</span>
+                                        <input type="text" class="receita-nome-edit-${r.id} px-2 py-1 border rounded w-full"
+                                               value="${esc(r.nome)}" onkeypress="if(event.key==='Enter') salvarInfoReceita(${r.id})" style="display: none;">
                                     </td>
                                     <td class="py-3 px-2">
-                                        <span class="receita-categoria-${receita.id}">${receita.categoria}</span>
-                                        <select class="receita-categoria-edit-${receita.id} px-2 py-1 border rounded" style="display: none;">
-                                            ${dados.configuracoes.categorias.map(cat => 
-                                                `<option value="${cat}" ${receita.categoria === cat ? 'selected' : ''}>${cat}</option>`
-                                            ).join('')}
+                                        <span class="receita-categoria-${r.id}">${esc(r.categoria)}</span>
+                                        <select class="receita-categoria-edit-${r.id} px-2 py-1 border rounded" style="display: none;">
+                                            ${dados.configuracoes.categorias.map(cat =>
+                                                `<option value="${esc(cat)}" ${r.categoria === cat ? 'selected' : ''}>${esc(cat)}</option>`).join('')}
                                         </select>
                                     </td>
-                                    <td class="py-3 px-2 text-right font-semibold text-green-600">${formatarMoeda(receita.custoTotal)}</td>
+                                    <td class="py-3 px-2 text-right font-semibold text-green-600">${formatarMoeda(r.custoTotal)}</td>
+                                    <td class="py-3 px-2 text-right">${r.precoVenda > 0 ? formatarMoeda(r.precoVenda) : '-'}</td>
                                     <td class="py-3 px-2 text-right">
-                                        <span class="text-sm font-medium ${(receita.margem || 60) >= 50 ? 'text-green-600' : (receita.margem || 60) >= 30 ? 'text-yellow-600' : 'text-red-600'}">
-                                            ${(receita.margem || 60)}%
-                                        </span>
+                                        <span class="text-sm font-medium ${classeMargem(m)}">${m.toFixed(0)}%</span>
                                     </td>
-                                    <td class="py-3 px-2 text-right">${receita.ingredientes.length}</td>
+                                    <td class="py-3 px-2 text-right">${r.ingredientes.length}</td>
                                     <td class="py-3 px-2 text-center">
-                                        <button onclick="editarReceita(${receita.id})" class="text-blue-600 hover:bg-blue-100 p-1 rounded mr-1" title="Editar Ingredientes">🍕</button>
-                                        <button onclick="editarInfoReceita(${receita.id})" class="receita-btn-edit-${receita.id} text-orange-600 hover:bg-orange-100 p-1 rounded mr-1" title="Editar Info">✏️</button>
-                                        <button onclick="salvarInfoReceita(${receita.id})" class="receita-btn-save-${receita.id} text-green-600 hover:bg-green-100 p-1 rounded mr-1" title="Salvar" style="display: none;">💾</button>
-                                        <button onclick="cancelarEdicaoReceita(${receita.id})" class="receita-btn-cancel-${receita.id} text-gray-600 hover:bg-gray-100 p-1 rounded mr-1" title="Cancelar" style="display: none;">❌</button>
-                                        <button onclick="excluirReceita(${receita.id})" class="text-red-600 hover:bg-red-100 p-1 rounded" title="Excluir">🗑️</button>
+                                        <button onclick="editarReceita(${r.id})" class="text-blue-600 hover:bg-blue-100 p-1 rounded mr-1" title="Editar Ingredientes">🍕</button>
+                                        <button onclick="editarInfoReceita(${r.id})" class="receita-btn-edit-${r.id} text-orange-600 hover:bg-orange-100 p-1 rounded mr-1" title="Editar Info">✏️</button>
+                                        <button onclick="salvarInfoReceita(${r.id})" class="receita-btn-save-${r.id} text-green-600 hover:bg-green-100 p-1 rounded mr-1" title="Salvar" style="display: none;">💾</button>
+                                        <button onclick="cancelarEdicaoReceita()" class="receita-btn-cancel-${r.id} text-gray-600 hover:bg-gray-100 p-1 rounded mr-1" title="Cancelar" style="display: none;">✖</button>
+                                        <button onclick="excluirReceita(${r.id})" class="text-red-600 hover:bg-red-100 p-1 rounded" title="Excluir">🗑️</button>
                                     </td>
-                                </tr>
-                            `).join('')}
+                                </tr>`;
+                            }).join('')}
                         </tbody>
                     </table>
                 </div>
             `;
-            
-            // Inicializar drag & drop para receitas
-            setTimeout(inicializarDragDropReceitas, 100);
+            inicializarDragDropReceitas();
         }
-        
-        // Editar receita
+
         function editarReceita(id) {
             const receita = dados.receitas.find(r => r.id === id);
             if (!receita) return;
-            
+
             dados.receitaAtual = receita;
             document.getElementById('nomeReceitaAtual').textContent = receita.nome;
             document.getElementById('editorReceita').style.display = 'block';
-            
-            // Configurar margem salva ou padrão
             document.getElementById('margemLucroReceita').value = receita.margem || 60;
-            
-            // Forçar recriação da interface de busca após o DOM estar pronto
-            setTimeout(() => {
-                criarInterfaceBuscaIngredientes();
-                limparSelecaoIngredienteReceita();
-                atualizarIngredientesReceita();
-            }, 100);
+            // Preço de venda: usa o já salvo; se não houver, fica vazio e é preenchido UMA vez com o sugerido
+            document.getElementById('precoVendaSugerido').value = receita.precoVenda > 0 ? receita.precoVenda.toFixed(2) : '';
+
+            limparSelecaoIngredienteReceita();
+            atualizarSelectIngredientes();
+            atualizarIngredientesReceita();
+            inicializarDragDrop();
+            document.getElementById('editorReceita').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-        
-        // Criar interface de busca de ingredientes
-        function criarInterfaceBuscaIngredientes() {
-            const container = document.querySelector('#editorReceita .grid.grid-cols-1.md\\:grid-cols-4');
-            if (!container) return;
-            
-            // Substituir todo o HTML da primeira div
-            const primeiraDiv = container.querySelector('div');
-            if (primeiraDiv) {
-                primeiraDiv.innerHTML = `
-                    <input type="text" 
-                           id="buscaIngredienteReceita" 
-                           placeholder="Buscar ingrediente..." 
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md"
-                           autocomplete="off">
-                    <div id="listaIngredientesFiltradaReceita" 
-                         class="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-md shadow-lg z-20 max-h-60 overflow-y-auto" 
-                         style="display: none;">
-                    </div>
-                    <input type="hidden" id="ingredienteSelecionadoReceita">
-                `;
-                
-                // Adicionar class relative se não tiver
-                if (!primeiraDiv.classList.contains('relative')) {
-                    primeiraDiv.classList.add('relative');
-                }
-                
-                // Adicionar event listeners
-                const inputBusca = document.getElementById('buscaIngredienteReceita');
-                if (inputBusca) {
-                    inputBusca.addEventListener('input', filtrarIngredientesReceita);
-                    inputBusca.addEventListener('focus', mostrarListaIngredientesReceita);
-                    inputBusca.addEventListener('blur', () => setTimeout(ocultarListaIngredientesReceita, 150));
-                    inputBusca.addEventListener('keydown', navegarListaIngredientesReceita);
-                }
-            }
-        }
-        
-        // Fechar editor
+
         function fecharEditor() {
             dados.receitaAtual = null;
             document.getElementById('editorReceita').style.display = 'none';
         }
-        
-        // === FILTRO DE INGREDIENTES PARA RECEITAS ===
-        
-        let ingredienteSelecionadoIndexReceita = -1;
-        let ingredientesFiltradosReceita = [];
-        
-        // Mostrar lista de ingredientes da receita
-        function mostrarListaIngredientesReceita() {
-            const lista = document.getElementById('listaIngredientesFiltradaReceita');
-            if (!lista) return;
-            
-            lista.style.display = 'block';
-            ingredienteSelecionadoIndexReceita = -1;
-            filtrarIngredientesReceita();
-        }
-        
-        // Ocultar lista de ingredientes da receita
-        function ocultarListaIngredientesReceita() {
-            const lista = document.getElementById('listaIngredientesFiltradaReceita');
-            if (lista) lista.style.display = 'none';
-            ingredienteSelecionadoIndexReceita = -1;
-        }
-        
-        // Filtrar ingredientes da receita
-        function filtrarIngredientesReceita() {
-            const campoBusca = document.getElementById('buscaIngredienteReceita');
-            const lista = document.getElementById('listaIngredientesFiltradaReceita');
-            
-            if (!campoBusca || !lista || !dados.ingredientes) return;
-            
-            const busca = campoBusca.value.toLowerCase().trim();
-            
-            // Se vazio, mostrar todos
-            if (!busca) {
-                ingredientesFiltradosReceita = [...dados.ingredientes];
-            } else {
-                ingredientesFiltradosReceita = dados.ingredientes.filter(ing => 
-                    ing.nome.toLowerCase().includes(busca)
-                );
-            }
-            
-            if (ingredientesFiltradosReceita.length === 0) {
-                lista.innerHTML = '<div class="px-3 py-2 text-gray-500 text-sm">Nenhum ingrediente encontrado</div>';
-                return;
-            }
-            
-            lista.innerHTML = ingredientesFiltradosReceita.map((ing, index) => `
-                <div class="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0 ingrediente-item" 
-                     data-id="${ing.id}" data-nome="${ing.nome}" data-unidade="${ing.unidade}" data-preco="${ing.precoUnidade}"
-                     onclick="selecionarIngredienteReceita(${ing.id}, '${ing.nome}', '${ing.unidade}', ${ing.precoUnidade})">
-                    <div class="flex justify-between items-center">
-                        <span class="font-medium">${ing.nome}</span>
-                        <span class="text-sm text-gray-500">${formatarMoeda(ing.precoUnidade)}/${ing.unidade}</span>
-                    </div>
-                    <div class="text-xs text-gray-400">Estoque: ${ing.quantidade} ${ing.unidade}</div>
-                </div>
-            `).join('');
-            
-            ingredienteSelecionadoIndexReceita = -1;
-        }
-        
-        // Navegar na lista da receita com teclado
-        function navegarListaIngredientesReceita(event) {
-            const lista = document.getElementById('listaIngredientesFiltradaReceita');
-            if (!lista || lista.style.display === 'none') return;
-            
-            const itens = lista.querySelectorAll('.ingrediente-item');
-            if (itens.length === 0) return;
-            
-            if (event.key === 'ArrowDown') {
-                event.preventDefault();
-                ingredienteSelecionadoIndexReceita = Math.min(ingredienteSelecionadoIndexReceita + 1, itens.length - 1);
-                destacarItemSelecionadoReceita(itens);
-            } else if (event.key === 'ArrowUp') {
-                event.preventDefault();
-                ingredienteSelecionadoIndexReceita = Math.max(ingredienteSelecionadoIndexReceita - 1, -1);
-                destacarItemSelecionadoReceita(itens);
-            } else if (event.key === 'Enter') {
-                event.preventDefault();
-                if (ingredienteSelecionadoIndexReceita >= 0 && ingredienteSelecionadoIndexReceita < itens.length) {
-                    const item = itens[ingredienteSelecionadoIndexReceita];
-                    const id = item.dataset.id;
-                    const nome = item.dataset.nome;
-                    const unidade = item.dataset.unidade;
-                    const preco = parseFloat(item.dataset.preco);
-                    selecionarIngredienteReceita(parseInt(id), nome, unidade, preco);
-                }
-            } else if (event.key === 'Escape') {
-                ocultarListaIngredientesReceita();
-                event.target.blur();
-            }
-        }
-        
-        // Selecionar ingrediente da receita
-        function selecionarIngredienteReceita(id, nome, unidade, precoUnidade) {
-            const campoBusca = document.getElementById('buscaIngredienteReceita');
-            const campoHidden = document.getElementById('ingredienteSelecionadoReceita');
-            const unidadeSpan = document.getElementById('unidadeAtualReceita');
-            
-            if (campoBusca) campoBusca.value = nome;
-            if (campoHidden) campoHidden.value = id;
-            if (unidadeSpan) unidadeSpan.textContent = unidade;
-            
-            ocultarListaIngredientesReceita();
-            
-            // Focar no campo quantidade
-            const campoQuantidade = document.getElementById('quantidadeIngredienteReceita');
-            if (campoQuantidade) campoQuantidade.focus();
-        }
-        
-        // Destacar item selecionado da receita
-        function destacarItemSelecionadoReceita(itens) {
-            itens.forEach((item, index) => {
-                if (index === ingredienteSelecionadoIndexReceita) {
-                    item.classList.add('bg-blue-100');
-                    item.scrollIntoView({ block: 'nearest' });
-                } else {
-                    item.classList.remove('bg-blue-100');
-                }
-            });
-        }
-        
-        // Limpar seleção da receita
+
         function limparSelecaoIngredienteReceita() {
-            const campoBusca = document.getElementById('buscaIngredienteReceita');
-            const campoHidden = document.getElementById('ingredienteSelecionadoReceita');
-            const unidadeAtual = document.getElementById('unidadeAtualReceita');
-            
-            if (campoBusca) campoBusca.value = '';
-            if (campoHidden) campoHidden.value = '';
-            if (unidadeAtual) unidadeAtual.textContent = '-';
-            
-            ocultarListaIngredientesReceita();
-        }
-        
-        // Adicionar ingrediente à receita (nova função)
-        function adicionarIngredienteAReceita() {
-            if (!dados.receitaAtual) return;
-            
-            const ingredienteId = document.getElementById('ingredienteSelecionadoReceita').value;
-            const quantidade = parseFloat(document.getElementById('quantidadeIngredienteReceita').value);
-            
-            if (!ingredienteId || !quantidade || quantidade <= 0) {
-                alert('Selecione um ingrediente e quantidade válida!');
-                return;
-            }
-            
-            const ingrediente = dados.ingredientes.find(ing => ing.id == ingredienteId);
-            if (!ingrediente) return;
-            
-            const ingredienteReceita = {
-                id: Date.now(),
-                ingredienteId: ingrediente.id,
-                nome: ingrediente.nome,
-                quantidade: quantidade,
-                unidade: ingrediente.unidade,
-                custoUnitario: ingrediente.precoUnidade,
-                custoTotal: ingrediente.precoUnidade * quantidade
-            };
-            
-            dados.receitaAtual.ingredientes.push(ingredienteReceita);
-            
-            // Limpar campos
-            limparSelecaoIngredienteReceita();
+            const sel = document.getElementById('ingredienteReceita');
+            if (sel) sel.value = '';
             document.getElementById('quantidadeIngredienteReceita').value = '';
-            
-            atualizarIngredientesReceita();
+            document.getElementById('unidadeAtual').textContent = '-';
         }
-        
-        // === FIM DRAG & DROP ===
-        
-        // Remover funções antigas de busca (não mais necessárias)
-        function mostrarListaIngredientesReceita() { /* removida */ }
-        function ocultarListaIngredientesReceita() { /* removida */ }
-        function filtrarIngredientesReceita() { /* removida */ }
-        function navegarListaIngredientesReceita() { /* removida */ }
-        function selecionarIngredienteReceita() { /* removida */ }
-        function limparSelecaoIngredienteReceita() { /* removida */ }
-        function adicionarIngredienteAReceita() { /* removida */ }
-        function criarInterfaceBuscaIngredientes() { /* removida */ }
-        function inicializarBuscaIngredientes() { /* removida */ }
-        
-        // === PRECIFICAÇÃO PRINCIPAL ===
-        
-        // Mostrar lista de ingredientes
-        function mostrarListaIngredientes() {
-            document.getElementById('listaIngredientesFiltrada').style.display = 'block';
-            filtrarIngredientes();
-        }
-        
-        // Ocultar lista de ingredientes
-        function ocultarListaIngredientes() {
-            document.getElementById('listaIngredientesFiltrada').style.display = 'none';
-        }
-        
-        // Filtrar ingredientes por nome
-        function filtrarIngredientes() {
-            const busca = document.getElementById('buscaIngrediente').value.toLowerCase();
-            const ingredientesFiltrados = dados.ingredientes.filter(ing => 
-                ing.nome.toLowerCase().includes(busca)
-            );
-            
-            const lista = document.getElementById('listaIngredientesFiltrada');
-            
-            if (ingredientesFiltrados.length === 0) {
-                lista.innerHTML = '<div class="px-3 py-2 text-gray-500 text-sm">Nenhum ingrediente encontrado</div>';
-                return;
-            }
-            
-            lista.innerHTML = ingredientesFiltrados.map(ing => `
-                <div class="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0" 
-                     onclick="selecionarIngrediente(${ing.id}, '${ing.nome}', '${ing.unidade}', ${ing.precoUnidade})">
-                    <div class="flex justify-between items-center">
-                        <span class="font-medium">${ing.nome}</span>
-                        <span class="text-sm text-gray-500">${formatarMoeda(ing.precoUnidade)}/${ing.unidade}</span>
-                    </div>
-                </div>
-            `).join('');
-        }
-        
-        // Selecionar ingrediente da lista
-        function selecionarIngrediente(id, nome, unidade, precoUnidade) {
-            document.getElementById('buscaIngrediente').value = nome;
-            document.getElementById('ingredienteReceita').value = id;
-            document.getElementById('unidadeAtual').textContent = unidade;
-            ocultarListaIngredientes();
-            
-            // Focar no campo quantidade
-            document.getElementById('quantidadeIngredienteReceita').focus();
-        }
-        
-        // Limpar seleção de ingrediente
-        function limparSelecaoIngrediente() {
-            const campoBusca = document.getElementById('buscaIngrediente');
-            const campoHidden = document.getElementById('ingredienteReceita');
-            const unidadeAtual = document.getElementById('unidadeAtual');
-            
-            if (campoBusca) campoBusca.value = '';
-            if (campoHidden) campoHidden.value = '';
-            if (unidadeAtual) unidadeAtual.textContent = '-';
-        }
-        
-        // Inicializar busca de ingredientes (chamada quando abre o editor)
-        function inicializarBuscaIngredientes() {
-            const campoBusca = document.getElementById('buscaIngrediente');
-            if (campoBusca) {
-                campoBusca.placeholder = 'Digite para buscar ingredientes...';
-                campoBusca.value = '';
-            }
-            
-            const lista = document.getElementById('listaIngredientesFiltrada');
-            if (lista) {
-                lista.innerHTML = '';
-                lista.style.display = 'none';
-            }
-            
-            // Mostrar todos os ingredientes inicialmente quando clicar no campo
-            setTimeout(() => {
-                if (campoBusca) {
-                    campoBusca.addEventListener('focus', function() {
-                        if (!this.value.trim()) {
-                            mostrarListaIngredientes();
-                        }
-                    });
-                }
-            }, 100);
-        }
-        
-        // === FIM FILTRO DE INGREDIENTES ===
 
-        // Atualizar select de ingredientes (removida - não é mais necessária)
         function atualizarSelectIngredientes() {
-            // Função mantida apenas para compatibilidade
+            const select = document.getElementById('ingredienteReceita');
+            if (!select) return;
+            const atual = select.value;
+            select.innerHTML = '<option value="">Selecionar ingrediente</option>' +
+                dados.ingredientes.map(ing =>
+                    `<option value="${ing.id}">${esc(ing.nome)} (${formatarMoeda(ing.precoUnidade)}/${ing.unidade})</option>`).join('');
+            select.value = atual;
+            select.onchange = function () {
+                const ing = dados.ingredientes.find(i => i.id == this.value);
+                document.getElementById('unidadeAtual').textContent = ing ? ing.unidade : '-';
+            };
         }
 
-        // Adicionar ingrediente à receita (função antiga - removida)
-        function adicionarIngredienteReceita() {
-            // Redirecionada para nova função
-            adicionarIngredienteAReceita();
-        }
-        
-        // Adicionar ingrediente à receita
         function adicionarIngredienteReceita() {
             if (!dados.receitaAtual) return;
-            
             const ingredienteId = document.getElementById('ingredienteReceita').value;
             const quantidade = parseFloat(document.getElementById('quantidadeIngredienteReceita').value);
-            
-            if (!ingredienteId || !quantidade || quantidade <= 0) {
-                alert('Selecione um ingrediente e quantidade válida!');
-                return;
-            }
-            
-            const ingrediente = dados.ingredientes.find(ing => ing.id == ingredienteId);
-            if (!ingrediente) return;
-            
-            const ingredienteReceita = {
+
+            if (!ingredienteId || !quantidade || quantidade <= 0) { alert('Selecione um ingrediente e quantidade válida!'); return; }
+            const ing = dados.ingredientes.find(i => i.id == ingredienteId);
+            if (!ing) return;
+
+            dados.receitaAtual.ingredientes.push({
                 id: Date.now(),
-                ingredienteId: ingrediente.id,
-                nome: ingrediente.nome,
+                ingredienteId: ing.id,
+                nome: ing.nome,
                 quantidade: quantidade,
-                unidade: ingrediente.unidade,
-                custoUnitario: ingrediente.precoUnidade,
-                custoTotal: ingrediente.precoUnidade * quantidade
-            };
-            
-            dados.receitaAtual.ingredientes.push(ingredienteReceita);
-            
-            // Limpar campos
-            limparSelecaoIngrediente();
-            document.getElementById('quantidadeIngredienteReceita').value = '';
-            
+                unidade: ing.unidade,
+                custoUnitario: ing.precoUnidade,
+                custoTotal: ing.precoUnidade * quantidade
+            });
+
+            limparSelecaoIngredienteReceita();
             atualizarIngredientesReceita();
         }
-        
-        // Atualizar ingredientes da receita
+
         function atualizarIngredientesReceita() {
-            if (!dados.receitaAtual) return;
-            
-            const custoTotal = dados.receitaAtual.ingredientes.reduce((total, ing) => total + ing.custoTotal, 0);
-            dados.receitaAtual.custoTotal = custoTotal;
-            
-            document.getElementById('ingredientesReceita').innerHTML = dados.receitaAtual.ingredientes.map(ing => `
+            const receita = dados.receitaAtual;
+            if (!receita) return;
+
+            const custoTotal = receita.ingredientes.reduce((t, i) => t + i.custoTotal, 0);
+            receita.custoTotal = custoTotal;
+
+            document.getElementById('ingredientesReceita').innerHTML = receita.ingredientes.map(ing => `
                 <tr class="border-b" draggable="true">
                     <td class="py-3 px-2">
                         <span class="drag-handle-receita cursor-move text-gray-400 hover:text-gray-600" title="Arrastar para reordenar">⋮⋮</span>
                     </td>
-                    <td class="py-3 px-2">${ing.nome}</td>
+                    <td class="py-3 px-2">${esc(ing.nome)}</td>
                     <td class="py-3 px-2 text-right">${ing.quantidade}</td>
                     <td class="py-3 px-2">${ing.unidade}</td>
                     <td class="py-3 px-2 text-right">${formatarMoeda(ing.custoUnitario)}</td>
@@ -1801,519 +1587,185 @@
                     </td>
                 </tr>
             `).join('');
-            
+
             document.getElementById('custoTotalReceita').textContent = formatarMoeda(custoTotal);
-            calcularPrecoSugerido();
-            
-            // Reinicializar drag & drop
-            setTimeout(inicializarDragDrop, 100);
+
+            // O preço de venda NÃO é recalculado aqui. Só é preenchido na primeira vez (campo vazio e sem preço salvo).
+            const campoPreco = document.getElementById('precoVendaSugerido');
+            if (!(parseFloat(campoPreco.value) > 0) && !(receita.precoVenda > 0) && custoTotal > 0) {
+                campoPreco.value = precoSugeridoAtual().toFixed(2);
+            }
+            atualizarSugestao();
+            atualizarMargemReal();
         }
-        
-        // Atualizar select de ingredientes (volta ao normal)
-        function atualizarSelectIngredientes() {
-            const select = document.getElementById('ingredienteReceita');
-            if (select) {
-                select.innerHTML = '<option value="">Selecionar ingrediente</option>' + 
-                    dados.ingredientes.map(ing => `<option value="${ing.id}">${ing.nome} (${formatarMoeda(ing.precoUnidade)}/${ing.unidade})</option>`).join('');
-                
-                // Atualizar unidade quando selecionar ingrediente
-                select.onchange = function() {
-                    const ing = dados.ingredientes.find(i => i.id == this.value);
-                    document.getElementById('unidadeAtual').textContent = ing ? ing.unidade : '-';
-                };
+
+        function precoSugeridoAtual() {
+            if (!dados.receitaAtual) return 0;
+            const margem = Math.min(parseFloat(document.getElementById('margemLucroReceita').value) || 0, 90);
+            return dados.receitaAtual.custoTotal / (1 - margem / 100);
+        }
+
+        // Só atualiza o texto de referência; não mexe no preço de venda
+        function atualizarSugestao() {
+            if (!dados.receitaAtual) return;
+            document.getElementById('precoSugeridoTexto').textContent = formatarMoeda(precoSugeridoAtual());
+        }
+
+        // Aplica o sugerido ao preço de venda (somente quando o usuário clica em "Usar")
+        function usarPrecoSugerido() {
+            if (!dados.receitaAtual) return;
+            document.getElementById('precoVendaSugerido').value = precoSugeridoAtual().toFixed(2);
+            atualizarMargemReal();
+        }
+
+        function atualizarMargemReal() {
+            if (!dados.receitaAtual) return;
+            const custo = dados.receitaAtual.custoTotal;
+            const preco = parseFloat(document.getElementById('precoVendaSugerido').value) || 0;
+            const el = document.getElementById('margemRealTexto');
+            if (preco > 0 && custo > 0) {
+                const m = (1 - custo / preco) * 100;
+                el.textContent = m.toFixed(1) + '% (lucro de ' + formatarMoeda(preco - custo) + ' por unidade)';
+                el.className = 'font-bold ' + classeMargem(m);
+            } else {
+                el.textContent = '-';
+                el.className = 'font-bold';
             }
         }
-        
-        // Adicionar ingrediente à receita (função original)
-        function adicionarIngredienteReceita() {
-            if (!dados.receitaAtual) return;
-            
-            const ingredienteId = document.getElementById('ingredienteReceita').value;
-            const quantidade = parseFloat(document.getElementById('quantidadeIngredienteReceita').value);
-            
-            if (!ingredienteId || !quantidade || quantidade <= 0) {
-                alert('Selecione um ingrediente e quantidade válida!');
-                return;
-            }
-            
-            const ingrediente = dados.ingredientes.find(ing => ing.id == ingredienteId);
-            if (!ingrediente) return;
-            
-            const ingredienteReceita = {
-                id: Date.now(),
-                ingredienteId: ingrediente.id,
-                nome: ingrediente.nome,
-                quantidade: quantidade,
-                unidade: ingrediente.unidade,
-                custoUnitario: ingrediente.precoUnidade,
-                custoTotal: ingrediente.precoUnidade * quantidade
-            };
-            
-            dados.receitaAtual.ingredientes.push(ingredienteReceita);
-            
-            // Limpar campos
-            document.getElementById('ingredienteReceita').value = '';
-            document.getElementById('quantidadeIngredienteReceita').value = '';
-            document.getElementById('unidadeAtual').textContent = '-';
-            
-            atualizarIngredientesReceita();
-        }
-        
-        // Calcular preço sugerido baseado na margem
-        function calcularPrecoSugerido() {
-            if (!dados.receitaAtual) return;
-            
-            const custoTotal = dados.receitaAtual.custoTotal;
-            const margem = parseFloat(document.getElementById('margemLucroReceita').value) || 60;
-            
-            // Fórmula: Preço = Custo ÷ (1 - Margem/100)
-            const precoSugerido = custoTotal / (1 - margem / 100);
-            
-            document.getElementById('precoVendaSugerido').value = precoSugerido.toFixed(2);
-        }
-        
-        // Calcular margem reversa (quando o usuário digita o preço)
-        function calcularMargemReversa() {
-            if (!dados.receitaAtual) return;
-            
-            const custoTotal = dados.receitaAtual.custoTotal;
-            const precoVenda = parseFloat(document.getElementById('precoVendaSugerido').value) || 0;
-            
-            if (precoVenda > 0 && custoTotal > 0) {
-                // Fórmula: Margem = (1 - Custo/Preço) × 100
-                const margem = (1 - custoTotal / precoVenda) * 100;
-                document.getElementById('margemLucroReceita').value = Math.max(0, Math.min(90, margem)).toFixed(0);
-            }
-        }
-        
-        // Remover ingrediente da receita
+
         function removerIngredienteReceita(id) {
             if (!dados.receitaAtual) return;
-            
-            dados.receitaAtual.ingredientes = dados.receitaAtual.ingredientes.filter(ing => ing.id !== id);
+            dados.receitaAtual.ingredientes = dados.receitaAtual.ingredientes.filter(i => i.id !== id);
             atualizarIngredientesReceita();
         }
-        
-        // Salvar receita
+
         function salvarReceita() {
             if (!dados.receitaAtual) return;
-            
-            // Salvar margem configurada
             dados.receitaAtual.margem = parseFloat(document.getElementById('margemLucroReceita').value) || 60;
-            
+            dados.receitaAtual.precoVenda = parseFloat(document.getElementById('precoVendaSugerido').value) || 0;
             salvarDados();
             atualizarListaReceitas();
             alert('Receita salva com sucesso!');
         }
-        
-        // Enviar para produtos
+
         function enviarParaProdutos() {
-            if (!dados.receitaAtual || dados.receitaAtual.ingredientes.length === 0) {
-                alert('Adicione ingredientes à receita antes de enviar!');
-                return;
-            }
-            
-            const custoTotal = dados.receitaAtual.custoTotal;
-            const precoSugerido = parseFloat(document.getElementById('precoVendaSugerido').value) || custoTotal * 2.5;
-            
-            // Verificar se produto já existe
-            const produtoExistente = dados.produtos.find(p => p.nome === dados.receitaAtual.nome);
-            
-            if (produtoExistente) {
-                if (confirm(`O produto "${dados.receitaAtual.nome}" já existe. Deseja atualizar o custo?`)) {
-                    produtoExistente.custo = custoTotal;
-                    produtoExistente.preco = precoSugerido;
+            const receita = dados.receitaAtual;
+            if (!receita || receita.ingredientes.length === 0) { alert('Adicione ingredientes à receita antes de enviar!'); return; }
+
+            const custoTotal = receita.custoTotal;
+            const preco = parseFloat(document.getElementById('precoVendaSugerido').value) || precoSugeridoAtual() || custoTotal * 2.5;
+
+            receita.margem = parseFloat(document.getElementById('margemLucroReceita').value) || 60;
+            receita.precoVenda = preco;
+
+            const existente = dados.produtos.find(p => p.nome === receita.nome);
+            if (existente) {
+                if (confirm(`O produto "${receita.nome}" já existe. Deseja atualizar custo e preço de venda?`)) {
+                    existente.custo = custoTotal;
+                    existente.preco = preco;
                 }
             } else {
-                // Criar novo produto
-                const novoProduto = {
-                    id: Date.now(),
-                    nome: dados.receitaAtual.nome,
-                    custo: custoTotal,
-                    preco: precoSugerido,
-                    categoria: dados.receitaAtual.categoria
-                };
-                
-                dados.produtos.push(novoProduto);
+                dados.produtos.push({ id: Date.now(), nome: receita.nome, custo: custoTotal, preco: preco, categoria: receita.categoria });
             }
-            
+
             salvarDados();
-            alert(`Produto "${dados.receitaAtual.nome}" enviado para a aba Produtos!\nCusto: ${formatarMoeda(custoTotal)}\nPreço sugerido: ${formatarMoeda(precoSugerido)}`);
+            atualizarListaReceitas();
+            alert(`Produto "${receita.nome}" enviado para a aba Produtos!\nCusto: ${formatarMoeda(custoTotal)}\nPreço de venda: ${formatarMoeda(preco)}`);
             fecharEditor();
         }
-        
-        // Editar informações da receita (nome e categoria)
+
         function editarInfoReceita(id) {
-            // Mostrar campos de edição
             document.querySelector(`.receita-nome-${id}`).style.display = 'none';
             document.querySelector(`.receita-categoria-${id}`).style.display = 'none';
             document.querySelector(`.receita-nome-edit-${id}`).style.display = 'block';
             document.querySelector(`.receita-categoria-edit-${id}`).style.display = 'block';
-            
-            // Trocar botões
             document.querySelector(`.receita-btn-edit-${id}`).style.display = 'none';
             document.querySelector(`.receita-btn-save-${id}`).style.display = 'inline-block';
             document.querySelector(`.receita-btn-cancel-${id}`).style.display = 'inline-block';
         }
-        
-        // Salvar informações da receita
+
         function salvarInfoReceita(id) {
             const novoNome = document.querySelector(`.receita-nome-edit-${id}`).value.trim();
             const novaCategoria = document.querySelector(`.receita-categoria-edit-${id}`).value;
-            
-            if (!novoNome) {
-                alert('O nome da receita não pode estar vazio!');
-                return;
-            }
-            
+            if (!novoNome) { alert('O nome da receita não pode estar vazio!'); return; }
+
             const receita = dados.receitas.find(r => r.id === id);
             if (receita) {
                 receita.nome = novoNome;
                 receita.categoria = novaCategoria;
             }
-            
             salvarDados();
             atualizarListaReceitas();
             alert('Informações da receita atualizadas!');
         }
-        
-        // Cancelar edição da receita
-        function cancelarEdicaoReceita(id) {
-            atualizarListaReceitas();
-        }
-        
-        // Excluir receita
+
+        function cancelarEdicaoReceita() { atualizarListaReceitas(); }
+
         function excluirReceita(id) {
             if (confirm('Tem certeza que deseja excluir esta receita?')) {
+                if (dados.receitaAtual && dados.receitaAtual.id === id) fecharEditor();
                 dados.receitas = dados.receitas.filter(r => r.id !== id);
                 salvarDados();
                 atualizarListaReceitas();
             }
         }
-        
-        // Atualizar precificação
+
         function atualizarPrecificacao() {
             atualizarCategoriaReceita();
             atualizarListaIngredientes();
             atualizarListaReceitas();
             atualizarSelectIngredientes();
-            
-            // Inicializar drag & drop após atualizar as listas
-            setTimeout(inicializarDragDrop, 200);
+            inicializarDragDrop();
         }
-        
-        // Atualizar select de categoria da receita
+
         function atualizarCategoriaReceita() {
-            document.getElementById('categoriaReceita').innerHTML = dados.configuracoes.categorias.map(cat => 
-                `<option value="${cat}">${cat}</option>`
-            ).join('');
+            const sel = document.getElementById('categoriaReceita');
+            const atual = sel.value;
+            sel.innerHTML = dados.configuracoes.categorias.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+            if (atual) sel.value = atual;
         }
 
-        // === FIM PRECIFICAÇÃO ===
-
-        // === EDIÇÃO DE PEDIDOS ===
-        
-        // Editar pedido
-        function editarPedido(id) {
-            // Esconder elementos de visualização
-            document.querySelector(`.pedido-data-${id}`).style.display = 'none';
-            document.querySelector(`.pedido-cliente-${id}`).style.display = 'none';
-            document.querySelector(`.pedido-telefone-${id}`).style.display = 'none';
-            document.querySelector(`.pedido-itens-${id}`).style.display = 'none';
-            
-            // Mostrar elementos de edição
-            document.querySelector(`.pedido-data-edit-${id}`).style.display = 'block';
-            document.querySelector(`.pedido-cliente-edit-${id}`).style.display = 'block';
-            document.querySelector(`.pedido-telefone-edit-${id}`).style.display = 'block';
-            document.querySelector(`.pedido-itens-edit-${id}`).style.display = 'block';
-            
-            // Trocar botões
-            document.querySelector(`.pedido-btn-edit-${id}`).style.display = 'none';
-            document.querySelector(`.pedido-btn-save-${id}`).style.display = 'inline-block';
-            document.querySelector(`.pedido-btn-cancel-${id}`).style.display = 'inline-block';
-        }
-        
-        // Salvar pedido editado
-        function salvarPedido(id) {
-            const novaData = document.querySelector(`.pedido-data-input-${id}`).value;
-            const novaHora = document.querySelector(`.pedido-hora-input-${id}`).value;
-            const novoCliente = document.querySelector(`.pedido-cliente-input-${id}`).value.trim();
-            const novoEndereco = document.querySelector(`.pedido-endereco-input-${id}`).value.trim();
-            const novoTelefone = document.querySelector(`.pedido-telefone-edit-${id}`).value.trim();
-            
-            if (!novoCliente) {
-                alert('O nome do cliente não pode estar vazio!');
-                return;
-            }
-            
-            const pedido = dados.pedidos.find(p => p.id === id);
-            if (pedido) {
-                pedido.data = novaData;
-                pedido.hora = novaHora;
-                pedido.cliente = novoCliente;
-                pedido.endereco = novoEndereco;
-                pedido.telefone = novoTelefone;
-            }
-            
-            salvarDados();
-            atualizarListaPedidos();
-            alert('Pedido atualizado com sucesso!');
-        }
-        
-        // Cancelar edição do pedido
-        function cancelarEdicaoPedido(id) {
-            atualizarListaPedidos();
-        }
-        
-        // Editar itens do pedido
-        function editarItensPedido(id) {
-            const pedido = dados.pedidos.find(p => p.id === id);
-            if (!pedido) return;
-            
-            // Criar modal para edição de itens
-            const modal = document.createElement('div');
-            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-            modal.innerHTML = `
-                <div class="bg-white p-6 rounded-lg shadow-lg max-w-4xl w-full mx-4 max-h-96 overflow-y-auto">
-                    <h3 class="text-lg font-semibold mb-4">✏️ Editar Itens - ${pedido.cliente}</h3>
-                    
-                    <div class="mb-4">
-                        <h4 class="font-medium mb-2">Itens Atuais:</h4>
-                        <div id="itensAtuaisPedido" class="space-y-2">
-                            ${pedido.itens.map((item, index) => `
-                                <div class="flex items-center gap-2 p-2 bg-gray-50 rounded" data-index="${index}">
-                                    <span class="flex-1">${item.nome}</span>
-                                    <input type="number" min="1" value="${item.quantidade}" 
-                                           class="w-16 px-2 py-1 border rounded text-center quantidade-item"
-                                           onchange="atualizarQuantidadeItem(this, ${index})">
-                                    <span class="w-20 text-right">${formatarMoeda(item.precoUnitario)}</span>
-                                    <span class="w-20 text-right font-semibold subtotal-item">${formatarMoeda(item.subtotal)}</span>
-                                    <button onclick="removerItemPedidoModal(${index})" class="text-red-600 hover:bg-red-100 p-1 rounded">🗑️</button>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <h4 class="font-medium mb-2">Adicionar Novo Item:</h4>
-                        <div class="flex gap-2">
-                            <select id="novoProdutoModal" class="flex-1 px-3 py-2 border rounded">
-                                <option value="">Selecionar produto</option>
-                                ${dados.produtos.map(produto => 
-                                    `<option value="${produto.id}" data-preco="${produto.preco}">${produto.nome} - ${formatarMoeda(produto.preco)}</option>`
-                                ).join('')}
-                            </select>
-                            <input type="number" id="novaQuantidadeModal" min="1" placeholder="Qtd" class="w-20 px-2 py-2 border rounded text-center">
-                            <button onclick="adicionarItemModal()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">➕</button>
-                        </div>
-                    </div>
-                    
-                    <div class="flex justify-between items-center p-3 bg-green-50 rounded mb-4">
-                        <span class="font-bold">Total:</span>
-                        <span id="totalPedidoModal" class="font-bold text-green-600">${formatarMoeda(pedido.total)}</span>
-                    </div>
-                    
-                    <div class="flex gap-2">
-                        <button onclick="salvarItensPedido(${id})" class="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
-                            💾 Salvar Alterações
-                        </button>
-                        <button onclick="fecharModalItens()" class="flex-1 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">
-                            ❌ Cancelar
-                        </button>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-            
-            // Guardar referência do pedido sendo editado
-            window.pedidoEditandoItens = pedido;
-        }
-        
-        // Atualizar quantidade de item no modal
-        function atualizarQuantidadeItem(input, index) {
-            const quantidade = parseInt(input.value) || 1;
-            const item = window.pedidoEditandoItens.itens[index];
-            
-            item.quantidade = quantidade;
-            item.subtotal = item.precoUnitario * quantidade;
-            
-            // Atualizar visualização
-            const container = input.closest('[data-index]');
-            container.querySelector('.subtotal-item').textContent = formatarMoeda(item.subtotal);
-            
-            atualizarTotalModal();
-        }
-        
-        // Remover item do pedido no modal
-        function removerItemPedidoModal(index) {
-            window.pedidoEditandoItens.itens.splice(index, 1);
-            
-            // Recriar lista de itens
-            const container = document.getElementById('itensAtuaisPedido');
-            container.innerHTML = window.pedidoEditandoItens.itens.map((item, newIndex) => `
-                <div class="flex items-center gap-2 p-2 bg-gray-50 rounded" data-index="${newIndex}">
-                    <span class="flex-1">${item.nome}</span>
-                    <input type="number" min="1" value="${item.quantidade}" 
-                           class="w-16 px-2 py-1 border rounded text-center quantidade-item"
-                           onchange="atualizarQuantidadeItem(this, ${newIndex})">
-                    <span class="w-20 text-right">${formatarMoeda(item.precoUnitario)}</span>
-                    <span class="w-20 text-right font-semibold subtotal-item">${formatarMoeda(item.subtotal)}</span>
-                    <button onclick="removerItemPedidoModal(${newIndex})" class="text-red-600 hover:bg-red-100 p-1 rounded">🗑️</button>
-                </div>
-            `).join('');
-            
-            atualizarTotalModal();
-        }
-        
-        // Adicionar novo item no modal
-        function adicionarItemModal() {
-            const produtoId = document.getElementById('novoProdutoModal').value;
-            const quantidade = parseInt(document.getElementById('novaQuantidadeModal').value);
-            
-            if (!produtoId || !quantidade || quantidade <= 0) {
-                alert('Selecione um produto e quantidade válida!');
-                return;
-            }
-            
-            const produto = dados.produtos.find(p => p.id == produtoId);
-            if (!produto) return;
-            
-            const novoItem = {
-                produtoId: produto.id,
-                nome: produto.nome,
-                quantidade: quantidade,
-                precoUnitario: produto.preco,
-                subtotal: produto.preco * quantidade
-            };
-            
-            window.pedidoEditandoItens.itens.push(novoItem);
-            
-            // Limpar campos
-            document.getElementById('novoProdutoModal').value = '';
-            document.getElementById('novaQuantidadeModal').value = '';
-            
-            // Recriar lista
-            const container = document.getElementById('itensAtuaisPedido');
-            container.innerHTML = window.pedidoEditandoItens.itens.map((item, index) => `
-                <div class="flex items-center gap-2 p-2 bg-gray-50 rounded" data-index="${index}">
-                    <span class="flex-1">${item.nome}</span>
-                    <input type="number" min="1" value="${item.quantidade}" 
-                           class="w-16 px-2 py-1 border rounded text-center quantidade-item"
-                           onchange="atualizarQuantidadeItem(this, ${index})">
-                    <span class="w-20 text-right">${formatarMoeda(item.precoUnitario)}</span>
-                    <span class="w-20 text-right font-semibold subtotal-item">${formatarMoeda(item.subtotal)}</span>
-                    <button onclick="removerItemPedidoModal(${index})" class="text-red-600 hover:bg-red-100 p-1 rounded">🗑️</button>
-                </div>
-            `).join('');
-            
-            atualizarTotalModal();
-        }
-        
-        // Atualizar total do modal
-        function atualizarTotalModal() {
-            const total = window.pedidoEditandoItens.itens.reduce((sum, item) => sum + item.subtotal, 0);
-            window.pedidoEditandoItens.total = total;
-            document.getElementById('totalPedidoModal').textContent = formatarMoeda(total);
-        }
-        
-        // Salvar alterações dos itens
-        function salvarItensPedido(id) {
-            if (window.pedidoEditandoItens.itens.length === 0) {
-                alert('O pedido deve ter pelo menos um item!');
-                return;
-            }
-            
-            salvarDados();
-            fecharModalItens();
-            atualizarListaPedidos();
-            alert('Itens do pedido atualizados com sucesso!');
-        }
-        
-        // Fechar modal de edição de itens
-        function fecharModalItens() {
-            const modal = document.querySelector('.fixed.inset-0');
-            if (modal) modal.remove();
-            window.pedidoEditandoItens = null;
-        }
-        
-        // === FIM EDIÇÃO DE PEDIDOS ===
-
-        // Excluir pedido
-        function excluirPedido(id) {
-            if (confirm('Tem certeza que deseja excluir este pedido?')) {
-                dados.pedidos = dados.pedidos.filter(p => p.id !== id);
-                salvarDados();
-                atualizarListaPedidos();
-            }
-        }
-
-        // Adicionar saída
+        // ================= SAÍDAS =================
         function adicionarSaida() {
             const descricao = document.getElementById('descricaoSaida').value.trim();
             const valor = parseFloat(document.getElementById('valorSaida').value);
-            
-            if (!descricao || !valor) {
-                alert('Preencha descrição e valor!');
-                return;
-            }
-            
-            const saida = {
+            if (!descricao || !valor) { alert('Preencha descrição e valor!'); return; }
+
+            dados.saidas.push({
                 id: Date.now(),
                 data: document.getElementById('dataSaida').value,
                 descricao: descricao,
                 valor: valor,
                 categoria: document.getElementById('categoriaSaida').value,
                 formaPagamento: document.getElementById('formaPagamentoSaida').value
-            };
-            
-            dados.saidas.push(saida);
-            
-            // Limpar formulário
+            });
+
             document.getElementById('descricaoSaida').value = '';
             document.getElementById('valorSaida').value = '';
-            
             salvarDados();
             atualizarListaSaidas();
             alert('Saída adicionada com sucesso!');
         }
 
-        // === EDIÇÃO DE SAÍDAS ===
-        
-        // Editar saída
         function editarSaida(id) {
-            // Esconder elementos de visualização
-            document.querySelector(`.saida-data-${id}`).style.display = 'none';
-            document.querySelector(`.saida-descricao-${id}`).style.display = 'none';
-            document.querySelector(`.saida-categoria-${id}`).style.display = 'none';
-            document.querySelector(`.saida-pagamento-${id}`).style.display = 'none';
-            document.querySelector(`.saida-valor-${id}`).style.display = 'none';
-            
-            // Mostrar elementos de edição
-            document.querySelector(`.saida-data-edit-${id}`).style.display = 'block';
-            document.querySelector(`.saida-descricao-edit-${id}`).style.display = 'block';
-            document.querySelector(`.saida-categoria-edit-${id}`).style.display = 'block';
-            document.querySelector(`.saida-pagamento-edit-${id}`).style.display = 'block';
-            document.querySelector(`.saida-valor-edit-${id}`).style.display = 'block';
-            
-            // Trocar botões
+            ['data', 'descricao', 'categoria', 'pagamento', 'valor'].forEach(campo => {
+                document.querySelector(`.saida-${campo}-${id}`).style.display = 'none';
+                document.querySelector(`.saida-${campo}-edit-${id}`).style.display = 'block';
+            });
             document.querySelector(`.saida-btn-edit-${id}`).style.display = 'none';
             document.querySelector(`.saida-btn-save-${id}`).style.display = 'inline-block';
             document.querySelector(`.saida-btn-cancel-${id}`).style.display = 'inline-block';
         }
-        
-        // Salvar saída editada
+
         function salvarSaida(id) {
             const novaData = document.querySelector(`.saida-data-edit-${id}`).value;
             const novaDescricao = document.querySelector(`.saida-descricao-edit-${id}`).value.trim();
             const novaCategoria = document.querySelector(`.saida-categoria-edit-${id}`).value;
             const novoPagamento = document.querySelector(`.saida-pagamento-edit-${id}`).value;
             const novoValor = parseFloat(document.querySelector(`.saida-valor-edit-${id}`).value);
-            
-            if (!novaDescricao || !novoValor) {
-                alert('Descrição e valor são obrigatórios!');
-                return;
-            }
-            
+
+            if (!novaDescricao || !novoValor) { alert('Descrição e valor são obrigatórios!'); return; }
+
             const saida = dados.saidas.find(s => s.id === id);
             if (saida) {
                 saida.data = novaData;
@@ -2322,75 +1774,61 @@
                 saida.formaPagamento = novoPagamento;
                 saida.valor = novoValor;
             }
-            
             salvarDados();
             atualizarListaSaidas();
             alert('Saída atualizada com sucesso!');
         }
-        
-        // Cancelar edição da saída
-        function cancelarEdicaoSaida(id) {
-            atualizarListaSaidas();
-        }
-        
-        // === FIM EDIÇÃO DE SAÍDAS ===
 
-        // Atualizar saídas
+        function cancelarEdicaoSaida() { atualizarListaSaidas(); }
+
         function atualizarSaidas() {
             atualizarCategoriasSaidas();
             atualizarListaSaidas();
         }
-        
-        // Atualizar select de categorias de saídas
+
         function atualizarCategoriasSaidas() {
-            document.getElementById('categoriaSaida').innerHTML = dados.configuracoes.categoriasSaidas.map(cat => 
-                `<option value="${cat}">${cat}</option>`
-            ).join('');
+            const sel = document.getElementById('categoriaSaida');
+            const atual = sel.value;
+            sel.innerHTML = dados.configuracoes.categoriasSaidas.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+            if (atual) sel.value = atual;
         }
 
-        // Atualizar lista de saídas
         function atualizarListaSaidas() {
-            const saidasFiltradas = filtrarPorPeriodo(dados.saidas).sort((a, b) => new Date(b.data) - new Date(a.data));
-            
-            document.getElementById('listaSaidas').innerHTML = saidasFiltradas.map(saida => `
+            const saidas = filtrarPorPeriodo(dados.saidas).sort((a, b) => new Date(b.data) - new Date(a.data));
+
+            document.getElementById('listaSaidas').innerHTML = saidas.map(saida => `
                 <tr class="border-b hover:bg-gray-50" id="saida-${saida.id}">
                     <td class="py-3 px-2">
                         <span class="saida-data-${saida.id}">${formatarData(saida.data)}</span>
-                        <input type="date" class="saida-data-edit-${saida.id} px-2 py-1 border rounded w-full" 
-                               value="${saida.data}" style="display: none;">
+                        <input type="date" class="saida-data-edit-${saida.id} px-2 py-1 border rounded w-full" value="${saida.data}" style="display: none;">
                     </td>
                     <td class="py-3 px-2">
-                        <span class="saida-descricao-${saida.id}">${saida.descricao}</span>
-                        <input type="text" class="saida-descricao-edit-${saida.id} px-2 py-1 border rounded w-full" 
-                               value="${saida.descricao}" style="display: none;">
+                        <span class="saida-descricao-${saida.id}">${esc(saida.descricao)}</span>
+                        <input type="text" class="saida-descricao-edit-${saida.id} px-2 py-1 border rounded w-full" value="${esc(saida.descricao)}" style="display: none;">
                     </td>
                     <td class="py-3 px-2">
-                        <span class="saida-categoria-${saida.id}">${saida.categoria}</span>
+                        <span class="saida-categoria-${saida.id}">${esc(saida.categoria)}</span>
                         <select class="saida-categoria-edit-${saida.id} px-2 py-1 border rounded w-full" style="display: none;">
-                            ${dados.configuracoes.categoriasSaidas.map(cat => 
-                                `<option value="${cat}" ${saida.categoria === cat ? 'selected' : ''}>${cat}</option>`
-                            ).join('')}
+                            ${dados.configuracoes.categoriasSaidas.map(cat =>
+                                `<option value="${esc(cat)}" ${saida.categoria === cat ? 'selected' : ''}>${esc(cat)}</option>`).join('')}
                         </select>
                     </td>
                     <td class="py-3 px-2">
                         <span class="saida-pagamento-${saida.id}">${saida.formaPagamento || 'Dinheiro'}</span>
                         <select class="saida-pagamento-edit-${saida.id} px-2 py-1 border rounded w-full" style="display: none;">
-                            <option value="Dinheiro" ${(saida.formaPagamento || 'Dinheiro') === 'Dinheiro' ? 'selected' : ''}>Dinheiro</option>
-                            <option value="PIX" ${saida.formaPagamento === 'PIX' ? 'selected' : ''}>PIX</option>
-                            <option value="Cartão" ${saida.formaPagamento === 'Cartão' ? 'selected' : ''}>Cartão</option>
-                            <option value="Transferência" ${saida.formaPagamento === 'Transferência' ? 'selected' : ''}>Transferência</option>
+                            ${['Dinheiro', 'PIX', 'Cartão', 'Transferência'].map(f =>
+                                `<option value="${f}" ${(saida.formaPagamento || 'Dinheiro') === f ? 'selected' : ''}>${f}</option>`).join('')}
                         </select>
                     </td>
                     <td class="py-3 px-2 text-right">
                         <span class="saida-valor-${saida.id} font-semibold text-red-600">${formatarMoeda(saida.valor)}</span>
-                        <input type="number" step="0.01" class="saida-valor-edit-${saida.id} px-2 py-1 border rounded w-20 text-right" 
-                               value="${saida.valor}" style="display: none;">
+                        <input type="number" step="0.01" class="saida-valor-edit-${saida.id} px-2 py-1 border rounded w-20 text-right" value="${saida.valor}" style="display: none;">
                     </td>
                     <td class="py-3 px-2 text-center">
                         <div class="flex gap-1 justify-center">
                             <button onclick="editarSaida(${saida.id})" class="saida-btn-edit-${saida.id} text-blue-600 hover:bg-blue-100 p-1 rounded" title="Editar">✏️</button>
                             <button onclick="salvarSaida(${saida.id})" class="saida-btn-save-${saida.id} text-green-600 hover:bg-green-100 p-1 rounded" title="Salvar" style="display: none;">💾</button>
-                            <button onclick="cancelarEdicaoSaida(${saida.id})" class="saida-btn-cancel-${saida.id} text-gray-600 hover:bg-gray-100 p-1 rounded" title="Cancelar" style="display: none;">❌</button>
+                            <button onclick="cancelarEdicaoSaida()" class="saida-btn-cancel-${saida.id} text-gray-600 hover:bg-gray-100 p-1 rounded" title="Cancelar" style="display: none;">✖</button>
                             <button onclick="excluirSaida(${saida.id})" class="text-red-600 hover:bg-red-100 p-1 rounded" title="Excluir">🗑️</button>
                         </div>
                     </td>
@@ -2398,7 +1836,6 @@
             `).join('');
         }
 
-        // Excluir saída
         function excluirSaida(id) {
             if (confirm('Tem certeza que deseja excluir esta saída?')) {
                 dados.saidas = dados.saidas.filter(s => s.id !== id);
@@ -2407,60 +1844,42 @@
             }
         }
 
-        // Adicionar produto
+        // ================= PRODUTOS =================
         function adicionarProduto() {
             const nome = document.getElementById('nomeProduto').value.trim();
             const custo = parseFloat(document.getElementById('custoProduto').value);
             const preco = parseFloat(document.getElementById('precoProduto').value);
             const categoria = document.getElementById('categoriaProduto').value;
-            
-            if (!nome || !custo || !preco) {
-                alert('Preencha todos os campos!');
-                return;
-            }
-            
-            const produto = {
-                id: Date.now(),
-                nome: nome,
-                custo: custo,
-                preco: preco,
-                categoria: categoria
-            };
-            
-            dados.produtos.push(produto);
-            
-            // Limpar formulário
+            if (!nome || !custo || !preco) { alert('Preencha todos os campos!'); return; }
+
+            dados.produtos.push({ id: Date.now(), nome, custo, preco, categoria });
             document.getElementById('nomeProduto').value = '';
             document.getElementById('custoProduto').value = '';
             document.getElementById('precoProduto').value = '';
-            
             salvarDados();
             atualizarProdutos();
         }
 
-        // Atualizar produtos
         function atualizarProdutos() {
             atualizarCategoriaProduto();
             atualizarListaProdutos();
         }
 
-        // Atualizar select de categoria
         function atualizarCategoriaProduto() {
-            document.getElementById('categoriaProduto').innerHTML = dados.configuracoes.categorias.map(cat => 
-                `<option value="${cat}">${cat}</option>`
-            ).join('');
+            const sel = document.getElementById('categoriaProduto');
+            const atual = sel.value;
+            sel.innerHTML = dados.configuracoes.categorias.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+            if (atual) sel.value = atual;
         }
 
-        // Atualizar lista de produtos
         function atualizarListaProdutos() {
             let html = '';
             dados.configuracoes.categorias.forEach(categoria => {
                 const produtos = dados.produtos.filter(p => p.categoria === categoria);
                 if (produtos.length === 0) return;
-                
                 html += `
                     <div class="bg-white p-6 rounded-lg shadow mb-6">
-                        <h3 class="text-lg font-semibold mb-4">${categoria}</h3>
+                        <h3 class="text-lg font-semibold mb-4">${esc(categoria)}</h3>
                         <div class="overflow-x-auto">
                             <table class="w-full text-sm">
                                 <thead>
@@ -2479,31 +1898,26 @@
                                         const lucro = produto.preco - produto.custo;
                                         return `
                                             <tr class="border-b hover:bg-gray-50">
-                                                <td class="py-3 px-2 font-medium">${produto.nome}</td>
+                                                <td class="py-3 px-2 font-medium">${esc(produto.nome)}</td>
                                                 <td class="py-3 px-2 text-right">${formatarMoeda(produto.custo)}</td>
                                                 <td class="py-3 px-2 text-right font-semibold">${formatarMoeda(produto.preco)}</td>
                                                 <td class="py-3 px-2 text-right">
-                                                    <span class="font-semibold ${margem >= 50 ? 'text-green-600' : margem >= 30 ? 'text-yellow-600' : 'text-red-600'}">
-                                                        ${margem.toFixed(1)}%
-                                                    </span>
+                                                    <span class="font-semibold ${classeMargem(margem)}">${margem.toFixed(1)}%</span>
                                                 </td>
                                                 <td class="py-3 px-2 text-right font-semibold text-green-600">${formatarMoeda(lucro)}</td>
                                                 <td class="py-3 px-2 text-center">
                                                     <button onclick="excluirProduto(${produto.id})" class="text-red-600 hover:bg-red-100 p-1 rounded">🗑️</button>
                                                 </td>
-                                            </tr>
-                                        `;
+                                            </tr>`;
                                     }).join('')}
                                 </tbody>
                             </table>
                         </div>
-                    </div>
-                `;
+                    </div>`;
             });
             document.getElementById('listaProdutosPorCategoria').innerHTML = html;
         }
 
-        // Excluir produto
         function excluirProduto(id) {
             if (confirm('Tem certeza que deseja excluir este produto?')) {
                 dados.produtos = dados.produtos.filter(p => p.id !== id);
@@ -2512,73 +1926,55 @@
             }
         }
 
-        // Atualizar calculadora
+        // ================= CALCULADORA =================
         function atualizarCalculadora() {
             atualizarSelectProdutosCalculadora();
             atualizarAnaliseLucratividade();
+            atualizarSimulacao();
         }
 
-        // Atualizar select de produtos da calculadora
         function atualizarSelectProdutosCalculadora() {
             let html = '<option value="">Selecione um produto</option>';
             dados.configuracoes.categorias.forEach(categoria => {
                 const produtos = dados.produtos.filter(p => p.categoria === categoria);
                 if (produtos.length > 0) {
-                    html += `<optgroup label="${categoria}">`;
-                    produtos.forEach(produto => {
-                        html += `<option value="${produto.id}">${produto.nome} - ${formatarMoeda(produto.preco)}</option>`;
-                    });
+                    html += `<optgroup label="${esc(categoria)}">`;
+                    produtos.forEach(p => { html += `<option value="${p.id}">${esc(p.nome)} - ${formatarMoeda(p.preco)}</option>`; });
                     html += '</optgroup>';
                 }
             });
             document.getElementById('produtoCalculadora').innerHTML = html;
         }
 
-        // Adicionar item à calculadora
         function adicionarItemCalculadora() {
             const produtoId = document.getElementById('produtoCalculadora').value;
             const quantidade = parseInt(document.getElementById('quantidadeCalculadora').value);
-            
-            if (!produtoId || !quantidade || quantidade <= 0) {
-                alert('Selecione um produto e quantidade válida!');
-                return;
-            }
-            
+            if (!produtoId || !quantidade || quantidade <= 0) { alert('Selecione um produto e quantidade válida!'); return; }
             const produto = dados.produtos.find(p => p.id == produtoId);
             if (!produto) return;
-            
-            const item = {
+
+            dados.simulacao.push({
                 id: Date.now(),
                 produto: produto,
                 quantidade: quantidade,
                 receita: produto.preco * quantidade,
                 custo: produto.custo * quantidade,
                 lucro: (produto.preco - produto.custo) * quantidade
-            };
-            
-            dados.simulacao.push(item);
-            
-            // Limpar campos
+            });
+
             document.getElementById('produtoCalculadora').value = '';
             document.getElementById('quantidadeCalculadora').value = '';
-            
             atualizarSimulacao();
         }
 
-        // Atualizar simulação
         function atualizarSimulacao() {
             const container = document.getElementById('simulacaoCalculadora');
-            
-            if (dados.simulacao.length === 0) {
-                container.style.display = 'none';
-                return;
-            }
-            
+            if (dados.simulacao.length === 0) { container.style.display = 'none'; return; }
             container.style.display = 'block';
-            
+
             document.getElementById('itensCalculadora').innerHTML = dados.simulacao.map(item => `
                 <tr class="border-b">
-                    <td class="py-2 px-2">${item.produto.nome}</td>
+                    <td class="py-2 px-2">${esc(item.produto.nome)}</td>
                     <td class="py-2 px-2 text-right">${item.quantidade}</td>
                     <td class="py-2 px-2 text-right">${formatarMoeda(item.receita)}</td>
                     <td class="py-2 px-2 text-right text-red-600">${formatarMoeda(item.custo)}</td>
@@ -2588,264 +1984,183 @@
                     </td>
                 </tr>
             `).join('');
-            
-            const totais = dados.simulacao.reduce((acc, item) => ({
-                receita: acc.receita + item.receita,
-                custo: acc.custo + item.custo,
-                lucro: acc.lucro + item.lucro
+
+            const totais = dados.simulacao.reduce((acc, i) => ({
+                receita: acc.receita + i.receita,
+                custo: acc.custo + i.custo,
+                lucro: acc.lucro + i.lucro
             }), { receita: 0, custo: 0, lucro: 0 });
-            
             const margem = totais.receita > 0 ? (totais.lucro / totais.receita) * 100 : 0;
-            
+
             document.getElementById('receitaSimulacao').textContent = formatarMoeda(totais.receita);
             document.getElementById('custoSimulacao').textContent = formatarMoeda(totais.custo);
             document.getElementById('lucroSimulacao').textContent = formatarMoeda(totais.lucro);
             document.getElementById('margemSimulacao').textContent = margem.toFixed(1) + '%';
         }
 
-        // Remover item da simulação
         function removerItemSimulacao(id) {
-            dados.simulacao = dados.simulacao.filter(item => item.id !== id);
+            dados.simulacao = dados.simulacao.filter(i => i.id !== id);
             atualizarSimulacao();
         }
 
-        // Limpar simulação
         function limparSimulacao() {
             dados.simulacao = [];
             atualizarSimulacao();
         }
 
-        // Atualizar análise de lucratividade
         function atualizarAnaliseLucratividade() {
-            const produtosOrdenados = [...dados.produtos].sort((a, b) => (b.preco - b.custo) - (a.preco - a.custo));
-            
-            document.getElementById('analiseLucratividade').innerHTML = produtosOrdenados.map(produto => {
+            const ordenados = [...dados.produtos].sort((a, b) => (b.preco - b.custo) - (a.preco - a.custo));
+            document.getElementById('analiseLucratividade').innerHTML = ordenados.map(produto => {
                 const lucro = produto.preco - produto.custo;
                 const margem = (lucro / produto.preco) * 100;
                 let status, statusClass;
-                
-                if (margem >= 50) {
-                    status = 'Excelente';
-                    statusClass = 'bg-green-100 text-green-800';
-                } else if (margem >= 30) {
-                    status = 'Bom';
-                    statusClass = 'bg-yellow-100 text-yellow-800';
-                } else {
-                    status = 'Atenção';
-                    statusClass = 'bg-red-100 text-red-800';
-                }
-                
+                if (margem >= 50) { status = 'Excelente'; statusClass = 'bg-green-100 text-green-800'; }
+                else if (margem >= 30) { status = 'Bom'; statusClass = 'bg-yellow-100 text-yellow-800'; }
+                else { status = 'Atenção'; statusClass = 'bg-red-100 text-red-800'; }
+
                 return `
                     <tr class="border-b hover:bg-gray-50">
-                        <td class="py-2 px-2">${produto.nome}</td>
+                        <td class="py-2 px-2">${esc(produto.nome)}</td>
                         <td class="py-2 px-2 text-right">${formatarMoeda(produto.custo)}</td>
                         <td class="py-2 px-2 text-right font-semibold">${formatarMoeda(produto.preco)}</td>
                         <td class="py-2 px-2 text-right font-bold text-green-600">${formatarMoeda(lucro)}</td>
-                        <td class="py-2 px-2 text-right font-semibold ${margem >= 50 ? 'text-green-600' : margem >= 30 ? 'text-yellow-600' : 'text-red-600'}">${margem.toFixed(1)}%</td>
+                        <td class="py-2 px-2 text-right font-semibold ${classeMargem(margem)}">${margem.toFixed(1)}%</td>
                         <td class="py-2 px-2 text-center">
                             <span class="px-2 py-1 rounded text-xs font-medium ${statusClass}">${status}</span>
                         </td>
-                    </tr>
-                `;
+                    </tr>`;
             }).join('');
         }
 
-        // === GERENCIAMENTO DE CATEGORIAS DE SAÍDAS ===
-        
-        // Adicionar categoria de saída
-        function adicionarCategoriaSaida() {
-            const novaCategoria = document.getElementById('novaCategoriaSaida').value.trim();
-            console.log('Tentando adicionar categoria:', novaCategoria);
-            
-            if (!novaCategoria) {
-                alert('Digite o nome da categoria!');
-                return;
-            }
-            
-            if (dados.configuracoes.categoriasSaidas.includes(novaCategoria)) {
-                alert('Esta categoria já existe!');
-                return;
-            }
-            
-            dados.configuracoes.categoriasSaidas.push(novaCategoria);
-            document.getElementById('novaCategoriaSaida').value = '';
-            
-            console.log('Categorias atuais:', dados.configuracoes.categoriasSaidas);
-            
-            salvarDados();
-            atualizarListaCategoriasSaidas();
-            atualizarCategoriasSaidas();
-            alert(`Categoria "${novaCategoria}" adicionada com sucesso!`);
-        }
-        
-        // Atualizar lista de categorias de saídas
-        function atualizarListaCategoriasSaidas() {
-            const container = document.getElementById('listaCategoriasSaidas');
-            if (!container) {
-                console.log('Container listaCategoriasSaidas não encontrado');
-                return;
-            }
-            
-            console.log('Atualizando lista de categorias de saídas:', dados.configuracoes.categoriasSaidas);
-            
-            container.innerHTML = dados.configuracoes.categoriasSaidas.map(categoria => {
-                const saidasCount = dados.saidas.filter(s => s.categoria === categoria).length;
-                return `
-                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-2">
-                        <div>
-                            <span class="font-medium">${categoria}</span>
-                            <span class="text-sm text-gray-500 ml-2">(${saidasCount} saídas)</span>
-                        </div>
-                        ${dados.configuracoes.categoriasSaidas.length > 1 ? 
-                            `<button onclick="removerCategoriaSaida('${categoria}')" class="text-red-600 hover:bg-red-100 p-1 rounded">🗑️</button>` 
-                            : ''
-                        }
-                    </div>
-                `;
-            }).join('');
-        }
-        
-        // Remover categoria de saída
-        function removerCategoriaSaida(categoria) {
-            if (dados.configuracoes.categoriasSaidas.length <= 1) {
-                alert('Deve ter pelo menos uma categoria de saída!');
-                return;
-            }
-            
-            const saidasNaCategoria = dados.saidas.filter(s => s.categoria === categoria);
-            if (saidasNaCategoria.length > 0) {
-                const novaCategoria = dados.configuracoes.categoriasSaidas.find(c => c !== categoria);
-                if (!confirm(`Existem ${saidasNaCategoria.length} saídas na categoria "${categoria}". Elas serão movidas para "${novaCategoria}". Continuar?`)) {
-                    return;
-                }
-                // Mover saídas para a primeira categoria disponível
-                dados.saidas.forEach(saida => {
-                    if (saida.categoria === categoria) {
-                        saida.categoria = novaCategoria;
-                    }
-                });
-            }
-            
-            dados.configuracoes.categoriasSaidas = dados.configuracoes.categoriasSaidas.filter(c => c !== categoria);
-            
-            salvarDados();
-            atualizarListaCategoriasSaidas();
-            atualizarCategoriasSaidas();
-        }
-        
-        // === FIM GERENCIAMENTO DE CATEGORIAS DE SAÍDAS ===
-
-        // Atualizar configurações
+        // ================= CONFIGURAÇÕES =================
         function atualizarConfig() {
             atualizarListaCategorias();
             atualizarListaCategoriasSaidas();
         }
 
-        // Adicionar categoria
-        function adicionarCategoria() {
-            const novaCategoria = document.getElementById('novaCategoria').value.trim();
-            if (!novaCategoria) {
-                alert('Digite o nome da categoria!');
-                return;
-            }
-            
-            if (dados.configuracoes.categorias.includes(novaCategoria)) {
-                alert('Esta categoria já existe!');
-                return;
-            }
-            
-            dados.configuracoes.categorias.push(novaCategoria);
-            document.getElementById('novaCategoria').value = '';
-            
-            salvarDados();
-            atualizarListaCategorias();
-            atualizarCategoriaProduto();
-            atualizarCategoriaReceita();
-            atualizarListaCategoriasSaidas();
-            atualizarCategoriasSaidas();
-        }
-
-        // Atualizar lista de categorias
-        function atualizarListaCategorias() {
-            document.getElementById('listaCategorias').innerHTML = dados.configuracoes.categorias.map(categoria => {
-                const produtosCount = dados.produtos.filter(p => p.categoria === categoria).length;
-                return `
-                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-2">
-                        <div>
-                            <span class="font-medium">${categoria}</span>
-                            <span class="text-sm text-gray-500 ml-2">(${produtosCount} produtos)</span>
-                        </div>
-                        ${dados.configuracoes.categorias.length > 1 ? 
-                            `<button onclick="removerCategoria('${categoria}')" class="text-red-600 hover:bg-red-100 p-1 rounded">🗑️</button>` 
-                            : ''
-                        }
-                    </div>
-                `;
-            }).join('');
-        }
-
-        // Remover categoria
-        function removerCategoria(categoria) {
-            if (dados.configuracoes.categorias.length <= 1) {
-                alert('Deve ter pelo menos uma categoria!');
-                return;
-            }
-            
-            const produtosNaCategoria = dados.produtos.filter(p => p.categoria === categoria);
-            if (produtosNaCategoria.length > 0) {
-                const novaCategoria = dados.configuracoes.categorias.find(c => c !== categoria);
-                if (!confirm(`Existem ${produtosNaCategoria.length} produtos na categoria "${categoria}". Eles serão movidos para "${novaCategoria}". Continuar?`)) {
-                    return;
-                }
-                // Mover produtos para a primeira categoria disponível
-                dados.produtos.forEach(produto => {
-                    if (produto.categoria === categoria) {
-                        produto.categoria = novaCategoria;
-                    }
-                });
-            }
-            
-            dados.configuracoes.categorias = dados.configuracoes.categorias.filter(c => c !== categoria);
-            
-            salvarDados();
-            atualizarListaCategorias();
-            atualizarCategoriaProduto();
-        }
-
-        // Salvar configurações
         function salvarConfiguracoes() {
             dados.configuracoes.nome = document.getElementById('nomePizzaria').value;
             dados.configuracoes.telefone = document.getElementById('telefonePizzaria').value;
             dados.configuracoes.endereco = document.getElementById('enderecoPizzaria').value;
             dados.configuracoes.meta = parseFloat(document.getElementById('metaMensal').value) || 0;
-            
             salvarDados();
             alert('Configurações salvas!');
         }
 
-        // Exportar dados
+        // --- Categorias de produtos ---
+        function adicionarCategoria() {
+            const nova = document.getElementById('novaCategoria').value.trim();
+            if (!nova) { alert('Digite o nome da categoria!'); return; }
+            if (dados.configuracoes.categorias.includes(nova)) { alert('Esta categoria já existe!'); return; }
+
+            dados.configuracoes.categorias.push(nova);
+            document.getElementById('novaCategoria').value = '';
+            salvarDados();
+            atualizarListaCategorias();
+            atualizarCategoriaProduto();
+            atualizarCategoriaReceita();
+        }
+
+        function atualizarListaCategorias() {
+            document.getElementById('listaCategorias').innerHTML = dados.configuracoes.categorias.map((categoria, index) => {
+                const count = dados.produtos.filter(p => p.categoria === categoria).length;
+                return `
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-2">
+                        <div>
+                            <span class="font-medium">${esc(categoria)}</span>
+                            <span class="text-sm text-gray-500 ml-2">(${count} produtos)</span>
+                        </div>
+                        ${dados.configuracoes.categorias.length > 1
+                            ? `<button onclick="removerCategoria(${index})" class="text-red-600 hover:bg-red-100 p-1 rounded">🗑️</button>` : ''}
+                    </div>`;
+            }).join('');
+        }
+
+        function removerCategoria(index) {
+            const categoria = dados.configuracoes.categorias[index];
+            if (dados.configuracoes.categorias.length <= 1) { alert('Deve ter pelo menos uma categoria!'); return; }
+
+            const nova = dados.configuracoes.categorias.find(c => c !== categoria);
+            const afetados = dados.produtos.filter(p => p.categoria === categoria);
+            const afetadas = dados.receitas.filter(r => r.categoria === categoria);
+            if (afetados.length > 0 || afetadas.length > 0) {
+                if (!confirm(`Existem ${afetados.length} produtos e ${afetadas.length} receitas na categoria "${categoria}". Eles serão movidos para "${nova}". Continuar?`)) return;
+                afetados.forEach(p => p.categoria = nova);
+                afetadas.forEach(r => r.categoria = nova);
+            }
+
+            dados.configuracoes.categorias.splice(index, 1);
+            salvarDados();
+            atualizarListaCategorias();
+            atualizarCategoriaProduto();
+            atualizarCategoriaReceita();
+        }
+
+        // --- Categorias de saídas ---
+        function adicionarCategoriaSaida() {
+            const nova = document.getElementById('novaCategoriaSaida').value.trim();
+            if (!nova) { alert('Digite o nome da categoria!'); return; }
+            if (dados.configuracoes.categoriasSaidas.includes(nova)) { alert('Esta categoria já existe!'); return; }
+
+            dados.configuracoes.categoriasSaidas.push(nova);
+            document.getElementById('novaCategoriaSaida').value = '';
+            salvarDados();
+            atualizarListaCategoriasSaidas();
+            atualizarCategoriasSaidas();
+            alert(`Categoria "${nova}" adicionada com sucesso!`);
+        }
+
+        function atualizarListaCategoriasSaidas() {
+            const container = document.getElementById('listaCategoriasSaidas');
+            if (!container) return;
+            container.innerHTML = dados.configuracoes.categoriasSaidas.map((categoria, index) => {
+                const count = dados.saidas.filter(s => s.categoria === categoria).length;
+                return `
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-2">
+                        <div>
+                            <span class="font-medium">${esc(categoria)}</span>
+                            <span class="text-sm text-gray-500 ml-2">(${count} saídas)</span>
+                        </div>
+                        ${dados.configuracoes.categoriasSaidas.length > 1
+                            ? `<button onclick="removerCategoriaSaida(${index})" class="text-red-600 hover:bg-red-100 p-1 rounded">🗑️</button>` : ''}
+                    </div>`;
+            }).join('');
+        }
+
+        function removerCategoriaSaida(index) {
+            const categoria = dados.configuracoes.categoriasSaidas[index];
+            if (dados.configuracoes.categoriasSaidas.length <= 1) { alert('Deve ter pelo menos uma categoria de saída!'); return; }
+
+            const nova = dados.configuracoes.categoriasSaidas.find(c => c !== categoria);
+            const afetadas = dados.saidas.filter(s => s.categoria === categoria);
+            if (afetadas.length > 0) {
+                if (!confirm(`Existem ${afetadas.length} saídas na categoria "${categoria}". Elas serão movidas para "${nova}". Continuar?`)) return;
+                afetadas.forEach(s => s.categoria = nova);
+            }
+
+            dados.configuracoes.categoriasSaidas.splice(index, 1);
+            salvarDados();
+            atualizarListaCategoriasSaidas();
+            atualizarCategoriasSaidas();
+        }
+
+        // --- Backup ---
         function exportarDados() {
-            const backup = {
-                ...dados,
-                dataBackup: new Date().toISOString()
-            };
-            
+            const backup = { ...dados, receitaAtual: null, simulacao: [], dataBackup: new Date().toISOString() };
             const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `backup-pizzaria-${new Date().toISOString().split('T')[0]}.json`;
+            a.download = `backup-pizzaria-${hojeLocal()}.json`;
             a.click();
             URL.revokeObjectURL(url);
         }
 
-        // Importar dados
         function importarDados(event) {
             const file = event.target.files[0];
             if (!file) return;
-            
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
                 try {
                     const backup = JSON.parse(e.target.result);
                     if (confirm('Tem certeza que deseja importar estes dados? Todos os dados atuais serão substituídos.')) {
@@ -2861,7 +2176,6 @@
             event.target.value = '';
         }
 
-        // Limpar dados
         function limparDados() {
             if (confirm('ATENÇÃO: Isso apagará TODOS os dados. Tem certeza?')) {
                 localStorage.removeItem('pizzaria_dados');
@@ -2869,58 +2183,31 @@
             }
         }
 
-        // Inicialização
-        document.addEventListener('DOMContentLoaded', function() {
+        // ================= INICIALIZAÇÃO =================
+        document.addEventListener('DOMContentLoaded', function () {
             try {
                 carregarDados();
-                
-                // Garantir que categorias de saídas existam
-                if (!dados.configuracoes.categoriasSaidas || dados.configuracoes.categoriasSaidas.length === 0) {
-                    dados.configuracoes.categoriasSaidas = ['Ingredientes', 'Aluguel', 'Funcionários', 'Energia/Água', 'Gás', 'Marketing', 'Equipamentos', 'Outros'];
-                    salvarDados();
-                }
-                
                 showTab('dashboard');
-                
-                // Event listeners para atualização automática
-                const dataInicio = document.getElementById('dataInicio');
-                const dataFim = document.getElementById('dataFim');
-                const metaMensal = document.getElementById('metaMensal');
-                
-                if (dataInicio) dataInicio.addEventListener('change', () => {
-                    if (document.querySelector('.tab-content.active').id === 'dashboard') {
-                        atualizarDashboard();
-                    }
-                });
-                
-                if (dataFim) dataFim.addEventListener('change', () => {
-                    if (document.querySelector('.tab-content.active').id === 'dashboard') {
-                        atualizarDashboard();
-                    }
-                });
-                
-                if (metaMensal) metaMensal.addEventListener('change', (e) => {
+
+                const refrescar = () => atualizarAba(abaAtiva());
+                document.getElementById('dataInicio').addEventListener('change', refrescar);
+                document.getElementById('dataFim').addEventListener('change', refrescar);
+                document.getElementById('metaMensal').addEventListener('change', e => {
                     dados.configuracoes.meta = parseFloat(e.target.value) || 0;
                     salvarDados();
                 });
-                
-                // Enter nos campos
-                setTimeout(() => {
-                    const novaCategoria = document.getElementById('novaCategoria');
-                    if (novaCategoria) {
-                        novaCategoria.addEventListener('keypress', (e) => {
-                            if (e.key === 'Enter') adicionarCategoria();
-                        });
-                    }
-                }, 500);
-                
+                document.getElementById('novaCategoria').addEventListener('keypress', e => {
+                    if (e.key === 'Enter') adicionarCategoria();
+                });
+                document.getElementById('novaCategoriaSaida').addEventListener('keypress', e => {
+                    if (e.key === 'Enter') adicionarCategoriaSaida();
+                });
             } catch (error) {
                 console.error('Erro na inicialização:', error);
             }
         });
-        
-        // Tratamento de erro global
-        window.onerror = function(msg, url, lineNo, columnNo, error) {
+
+        window.onerror = function (msg, url, lineNo, columnNo, error) {
             console.error('Erro JavaScript:', error);
             return false;
         };
