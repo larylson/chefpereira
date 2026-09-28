@@ -692,16 +692,8 @@
             erroEl.textContent = '';
             const provider = new firebase.auth.GoogleAuthProvider();
             firebase.auth().signInWithPopup(provider).catch(err => {
-                console.error('Erro no login (popup):', err);
-                const semPopup = ['auth/popup-blocked', 'auth/cancelled-popup-request', 'auth/operation-not-supported-in-this-environment'];
-                if (semPopup.includes(err.code)) {
-                    firebase.auth().signInWithRedirect(provider).catch(err2 => {
-                        console.error('Erro no login (redirect):', err2);
-                        erroEl.textContent = `Erro: ${err2.code || err2.message}`;
-                    });
-                } else {
-                    erroEl.textContent = `Erro: ${err.code || err.message}`;
-                }
+                console.error('Erro no login:', err);
+                erroEl.textContent = 'Não foi possível entrar. Tente novamente.';
             });
         }
 
