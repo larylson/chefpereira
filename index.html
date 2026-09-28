@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema Gestão Pizzaria</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-auth-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-firestore-compat.min.js"></script>
     <style>
         body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
         @media print { .no-print { display: none; } }
@@ -16,7 +19,10 @@
     <div class="container mx-auto p-4 max-w-7xl">
         <!-- Header -->
         <header class="bg-white rounded-lg shadow p-6 mb-6 no-print">
-            <h1 class="text-3xl font-bold text-gray-900 mb-4">🍕 Sistema de Gestão - Pizzaria</h1>
+            <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <h1 class="text-3xl font-bold text-gray-900">🍕 Sistema de Gestão - Pizzaria</h1>
+                <span id="syncStatus" class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">⚪ Sem sincronização</span>
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label class="text-sm text-gray-600">Data Início:</label>
@@ -494,6 +500,49 @@
             </div>
 
             <div class="bg-white p-6 rounded-lg shadow mt-6">
+                <h3 class="text-lg font-semibold mb-4">🔄 Sincronização entre Dispositivos</h3>
+                <p class="text-sm text-gray-600 mb-4">
+                    Preencha com os dados do seu projeto Firebase (Configurações do Projeto → Seus apps → Config do SDK) e escolha um <strong>Código da Loja</strong>.
+                    Use exatamente o mesmo código e o mesmo projeto Firebase em todos os aparelhos para eles ficarem sincronizados.
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Código da Loja:</label>
+                        <input type="text" id="syncCodigoLoja" placeholder="ex: pizzaria-lorran" class="w-full px-3 py-2 border rounded-md">
+                    </div>
+                    <div></div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">apiKey:</label>
+                        <input type="text" id="syncApiKey" class="w-full px-3 py-2 border rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">authDomain:</label>
+                        <input type="text" id="syncAuthDomain" class="w-full px-3 py-2 border rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">projectId:</label>
+                        <input type="text" id="syncProjectId" class="w-full px-3 py-2 border rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">storageBucket:</label>
+                        <input type="text" id="syncStorageBucket" class="w-full px-3 py-2 border rounded-md">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium mb-1">appId:</label>
+                        <input type="text" id="syncAppId" class="w-full px-3 py-2 border rounded-md">
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-4">
+                    <button onclick="salvarConfigSync()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                        🔗 Salvar e Conectar
+                    </button>
+                    <button onclick="desativarSync()" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
+                        ✖ Desativar Sincronização
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow mt-6">
                 <h3 class="text-lg font-semibold mb-4">Backup & Restore</h3>
                 <div class="flex flex-wrap gap-4">
                     <button onclick="exportarDados()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
@@ -572,6 +621,13 @@
             // Pedidos antigos (sem forma de pagamento) já eram contabilizados: viram "Dinheiro"
             dados.pedidos.forEach(p => { if (!p.formaPagamento) p.formaPagamento = 'Dinheiro'; });
             dados.receitas.forEach(r => { if (!r.ingredientes) r.ingredientes = []; });
+            // Receitas de versões antigas não tinham preço de venda salvo: aproveita o preço do produto de mesmo nome
+            dados.receitas.forEach(r => {
+                if (!(r.precoVenda > 0)) {
+                    const prod = dados.produtos.find(p => p.nome === r.nome);
+                    if (prod) r.precoVenda = prod.preco;
+                }
+            });
             dados.receitaAtual = null;
             if (!dados.configuracoes.categorias || !dados.configuracoes.categorias.length) {
                 dados.configuracoes.categorias = ['Pizza', 'Bebida', 'Sobremesa', 'Outros'];
@@ -603,7 +659,118 @@
 
         function salvarDados() {
             localStorage.setItem('pizzaria_dados', JSON.stringify({ ...dados, receitaAtual: null, simulacao: [] }));
+            enviarParaNuvem();
         }
+
+        // ================= SINCRONIZAÇÃO ENTRE DISPOSITIVOS (Firebase) =================
+        let syncConfig = null;
+        let syncDb = null;
+        let syncDocRef = null;
+        let syncUnsub = null;
+        let syncIgnorarProximoEco = false;
+        let syncTimeout = null;
+
+        function carregarSyncConfig() {
+            const salvo = localStorage.getItem('pizzaria_sync_config');
+            if (salvo) {
+                try { syncConfig = JSON.parse(salvo); } catch (e) { syncConfig = null; }
+            }
+        }
+
+        function preencherCamposSync() {
+            if (!syncConfig) return;
+            const campos = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'appId', 'codigoLoja'];
+            const ids = ['syncApiKey', 'syncAuthDomain', 'syncProjectId', 'syncStorageBucket', 'syncAppId', 'syncCodigoLoja'];
+            campos.forEach((c, i) => {
+                const el = document.getElementById(ids[i]);
+                if (el) el.value = syncConfig[c] || '';
+            });
+        }
+
+        function statusSync(texto, classe) {
+            const el = document.getElementById('syncStatus');
+            if (el) { el.textContent = texto; el.className = 'text-xs px-2 py-1 rounded-full ' + classe; }
+        }
+
+        async function conectarSync() {
+            if (!syncConfig || !syncConfig.apiKey || !syncConfig.projectId || !syncConfig.appId || !syncConfig.codigoLoja) {
+                statusSync('⚪ Sem sincronização', 'bg-gray-100 text-gray-600');
+                return;
+            }
+            try {
+                statusSync('🟡 Conectando...', 'bg-yellow-100 text-yellow-700');
+                if (!firebase.apps.length) firebase.initializeApp(syncConfig);
+                await firebase.auth().signInAnonymously();
+                syncDb = firebase.firestore();
+                syncDocRef = syncDb.collection('pizzarias').doc(syncConfig.codigoLoja.trim());
+
+                if (syncUnsub) syncUnsub();
+                syncUnsub = syncDocRef.onSnapshot(doc => {
+                    if (!doc.exists) { enviarParaNuvem(); return; }
+                    if (syncIgnorarProximoEco) { syncIgnorarProximoEco = false; return; }
+                    const remoto = doc.data();
+                    if (remoto && remoto.dados) {
+                        dados = { ...dados, ...remoto.dados };
+                        normalizarDados();
+                        localStorage.setItem('pizzaria_dados', JSON.stringify(dados));
+                        atualizarAba(abaAtiva());
+                    }
+                    statusSync('🟢 Sincronizado', 'bg-green-100 text-green-700');
+                }, err => {
+                    console.error('Erro de sincronização:', err);
+                    statusSync('🔴 Erro de conexão', 'bg-red-100 text-red-700');
+                });
+            } catch (e) {
+                console.error(e);
+                statusSync('🔴 Falha ao conectar', 'bg-red-100 text-red-700');
+            }
+        }
+
+        function enviarParaNuvem() {
+            if (!syncDocRef) return;
+            clearTimeout(syncTimeout);
+            syncTimeout = setTimeout(async () => {
+                try {
+                    syncIgnorarProximoEco = true;
+                    await syncDocRef.set({
+                        dados: { ...dados, receitaAtual: null, simulacao: [] },
+                        atualizadoEm: new Date().toISOString()
+                    });
+                } catch (e) {
+                    console.error('Erro ao enviar para nuvem:', e);
+                    statusSync('🔴 Erro ao salvar na nuvem', 'bg-red-100 text-red-700');
+                }
+            }, 800);
+        }
+
+        function salvarConfigSync() {
+            const apiKey = document.getElementById('syncApiKey').value.trim();
+            const authDomain = document.getElementById('syncAuthDomain').value.trim();
+            const projectId = document.getElementById('syncProjectId').value.trim();
+            const storageBucket = document.getElementById('syncStorageBucket').value.trim();
+            const appId = document.getElementById('syncAppId').value.trim();
+            const codigoLoja = document.getElementById('syncCodigoLoja').value.trim();
+
+            if (!apiKey || !projectId || !appId || !codigoLoja) {
+                alert('Preencha ao menos apiKey, projectId, appId e o Código da Loja!');
+                return;
+            }
+
+            syncConfig = { apiKey, authDomain, projectId, storageBucket, appId, codigoLoja };
+            localStorage.setItem('pizzaria_sync_config', JSON.stringify(syncConfig));
+            conectarSync();
+            alert('Configuração salva!\nUse o mesmo Código da Loja e o mesmo projeto Firebase nos outros aparelhos.');
+        }
+
+        function desativarSync() {
+            if (!confirm('Isso desliga a sincronização neste aparelho. Os dados locais continuam aqui. Continuar?')) return;
+            if (syncUnsub) syncUnsub();
+            syncDocRef = null;
+            syncConfig = null;
+            localStorage.removeItem('pizzaria_sync_config');
+            statusSync('⚪ Sem sincronização', 'bg-gray-100 text-gray-600');
+        }
+        // ================= FIM SINCRONIZAÇÃO =================
 
         // ================= NAVEGAÇÃO =================
         function abaAtiva() {
@@ -2036,6 +2203,7 @@
         function atualizarConfig() {
             atualizarListaCategorias();
             atualizarListaCategoriasSaidas();
+            preencherCamposSync();
         }
 
         function salvarConfiguracoes() {
@@ -2187,6 +2355,8 @@
         document.addEventListener('DOMContentLoaded', function () {
             try {
                 carregarDados();
+                carregarSyncConfig();
+                conectarSync();
                 showTab('dashboard');
 
                 const refrescar = () => atualizarAba(abaAtiva());
