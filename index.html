@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chef Pereira - Controle</title>
+    <title>Sistema Gestão Pizzaria</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-app-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-auth-compat.min.js"></script>
@@ -19,7 +19,7 @@
     <!-- Tela de login -->
     <div id="loginGate" class="fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center z-50">
         <div class="bg-white rounded-lg shadow-lg p-8 max-w-sm w-full mx-4 text-center">
-            <h2 class="text-2xl font-bold mb-1">🍕 Chef Pereira 🍕 </h2>
+            <h2 class="text-2xl font-bold mb-1">🍕 Sistema de Gestão</h2>
             <p class="text-gray-600 mb-6 text-sm">Entre com sua conta Google para continuar</p>
             <button onclick="entrarComGoogle()" class="w-full bg-blue-600 text-white px-4 py-3 rounded-md hover:bg-blue-700 font-medium">
                 🔐 Entrar com Google
@@ -692,8 +692,16 @@
             erroEl.textContent = '';
             const provider = new firebase.auth.GoogleAuthProvider();
             firebase.auth().signInWithPopup(provider).catch(err => {
-                console.error('Erro no login:', err);
-                erroEl.textContent = 'Não foi possível entrar. Tente novamente.';
+                console.error('Erro no login (popup):', err);
+                const semPopup = ['auth/popup-blocked', 'auth/cancelled-popup-request', 'auth/operation-not-supported-in-this-environment'];
+                if (semPopup.includes(err.code)) {
+                    firebase.auth().signInWithRedirect(provider).catch(err2 => {
+                        console.error('Erro no login (redirect):', err2);
+                        erroEl.textContent = `Erro: ${err2.code || err2.message}`;
+                    });
+                } else {
+                    erroEl.textContent = `Erro: ${err.code || err.message}`;
+                }
             });
         }
 
