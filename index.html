@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema Gestão Pizzaria</title>
+    <title>Chef Pereira - Controle</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-app-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-auth-compat.min.js"></script>
@@ -19,7 +19,7 @@
     <!-- Tela de login -->
     <div id="loginGate" class="fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center z-50">
         <div class="bg-white rounded-lg shadow-lg p-8 max-w-sm w-full mx-4 text-center">
-            <h2 class="text-2xl font-bold mb-1">🍕 Sistema de Gestão</h2>
+            <h2 class="text-2xl font-bold mb-1">🍕 Chef Pereira 🍕</h2>
             <p class="text-gray-600 mb-6 text-sm">Entre com sua conta Google para continuar</p>
             <button onclick="entrarComGoogle()" class="w-full bg-blue-600 text-white px-4 py-3 rounded-md hover:bg-blue-700 font-medium">
                 🔐 Entrar com Google
@@ -32,7 +32,7 @@
         <!-- Header -->
         <header class="bg-white rounded-lg shadow p-6 mb-6 no-print">
             <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-                <h1 class="text-3xl font-bold text-gray-900">🍕 Sistema de Gestão - Pizzaria</h1>
+                <h1 class="text-3xl font-bold text-gray-900">🍕 Sistema de Gestão - Chef Pereira</h1>
                 <div class="flex items-center gap-2">
                     <span id="syncStatus" class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">⚪ Conectando...</span>
                     <span id="usuarioLogado" class="text-xs text-gray-600"></span>
@@ -522,7 +522,7 @@
                     entre todos os aparelhos onde você entrar com a mesma conta Google autorizada. Usuário atual:
                     <strong id="configUsuarioLogado">-</strong>.
                 </p>
-                <p class="text-xs text-gray-500 mt-2">Para autorizar Lucas e João Paulo, adicione os e-mails do Google deles nas regras de segurança do Firestore, no console do Firebase.</p>
+                <p class="text-xs text-gray-500 mt-2">Para autorizar outro Usuário, adicione os e-mails do Google deles nas regras de segurança do Firestore, no console do Firebase.</p>
             </div>
 
             <div class="bg-white p-6 rounded-lg shadow mt-6">
