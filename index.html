@@ -2128,6 +2128,93 @@
             }
         }
 
+        // ================= ATUALIZAÇÃO RÁPIDA DE PREÇOS DE VENDA =================
+        function atualizacaoRapidaPrecosVenda() {
+            if (dados.produtos.length === 0) { toast('Nenhum produto cadastrado ainda.', 'aviso'); return; }
+
+            const container = document.createElement('div');
+            container.id = 'modalPrecosVenda';
+            container.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            container.innerHTML = `
+                <div class="bg-white p-6 rounded-lg shadow-lg max-w-2xl w-full mx-4 confirm-pop">
+                    <h3 class="text-lg font-semibold mb-1">💲 Atualização Rápida de Preços de Venda</h3>
+                    <p class="text-sm text-gray-500 mb-4">Marque os produtos que quer alterar, ajuste o preço e salve.</p>
+                    <div class="flex items-center gap-2 mb-4 p-3 bg-gray-50 rounded-lg flex-wrap">
+                        <span class="text-sm font-medium">Ajustar marcados em:</span>
+                        <input type="number" id="ajustePercentual" step="1" placeholder="ex: 10 ou -5" class="w-24 px-2 py-1 border rounded text-right text-sm">
+                        <span class="text-sm text-gray-500">%</span>
+                        <button onclick="aplicarAjustePercentual()" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">Aplicar aos marcados</button>
+                        <button onclick="marcarTodosPrecoVenda(true)" class="ml-auto text-xs text-blue-600 hover:underline">Marcar todos</button>
+                        <button onclick="marcarTodosPrecoVenda(false)" class="text-xs text-gray-500 hover:underline">Desmarcar todos</button>
+                    </div>
+                    <div class="space-y-2 max-h-80 overflow-y-auto">
+                        ${dados.produtos.map(p => `
+                            <div class="flex items-center gap-2 p-2 border rounded-lg">
+                                <input type="checkbox" class="pv-check w-4 h-4" data-id="${p.id}">
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-medium text-sm truncate">${esc(p.nome)}</p>
+                                    <p class="text-xs text-gray-500">${esc(p.categoria)} · Custo: ${formatarMoeda(p.custo)}</p>
+                                </div>
+                                <input type="number" step="0.01" value="${p.preco}" class="pv-input w-24 px-2 py-1 border rounded text-right text-sm" data-id="${p.id}">
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="flex gap-2 mt-4">
+                        <button onclick="salvarAtualizacaoPrecosVenda()" class="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">💾 Salvar Marcados</button>
+                        <button onclick="fecharModal('modalPrecosVenda')" class="flex-1 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">✖ Cancelar</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(container);
+        }
+
+        function marcarTodosPrecoVenda(marcar) {
+            document.querySelectorAll('.pv-check').forEach(c => c.checked = marcar);
+        }
+
+        function aplicarAjustePercentual() {
+            const pct = parseFloat(document.getElementById('ajustePercentual').value);
+            if (isNaN(pct)) { toast('Digite um percentual válido!', 'aviso'); return; }
+            let aplicados = 0;
+            document.querySelectorAll('.pv-check:checked').forEach(check => {
+                const id = check.dataset.id;
+                const input = document.querySelector(`.pv-input[data-id="${id}"]`);
+                if (input) {
+                    const atual = parseFloat(input.value) || 0;
+                    input.value = Math.max(0, atual * (1 + pct / 100)).toFixed(2);
+                    aplicados++;
+                }
+            });
+            if (aplicados === 0) toast('Marque pelo menos um produto!', 'aviso');
+            else toast(`Ajuste de ${pct}% aplicado a ${aplicados} produto(s). Revise e salve.`, 'info');
+        }
+
+        function salvarAtualizacaoPrecosVenda() {
+            let atualizados = 0;
+            document.querySelectorAll('.pv-check:checked').forEach(check => {
+                const id = parseInt(check.dataset.id);
+                const input = document.querySelector(`.pv-input[data-id="${id}"]`);
+                const novoPreco = parseFloat(input.value);
+                const produto = dados.produtos.find(p => p.id === id);
+                if (produto && novoPreco > 0 && novoPreco !== produto.preco) {
+                    produto.preco = novoPreco;
+                    const receita = dados.receitas.find(r => r.nome === produto.nome);
+                    if (receita) receita.precoVenda = novoPreco;
+                    atualizados++;
+                }
+            });
+
+            if (atualizados > 0) {
+                salvarDados();
+                atualizarProdutos();
+                toast(`${atualizados} preço(s) de venda atualizado(s) na aba Produtos!`, 'sucesso');
+            } else {
+                toast('Nenhum produto marcado ou com valor alterado.', 'aviso');
+            }
+            fecharModal('modalPrecosVenda');
+        }
+        // ================= FIM ATUALIZAÇÃO RÁPIDA DE PREÇOS DE VENDA =================
+
         // ================= CALCULADORA =================
         function atualizarCalculadora() {
             atualizarSelectProdutosCalculadora();
