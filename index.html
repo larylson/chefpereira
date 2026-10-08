@@ -404,17 +404,6 @@
                     ➕ Adicionar Produto
                 </button>
             </div>
-
-            <div class="bg-white p-4 rounded-lg shadow mb-6 flex items-center justify-between flex-wrap gap-2">
-                <div>
-                    <h3 class="text-lg font-semibold">Preços de Venda</h3>
-                    <p class="text-sm text-gray-500">Marque os produtos que quiser e altere o preço de todos de uma vez.</p>
-                </div>
-                <button onclick="atualizacaoRapidaPrecosVenda()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm">
-                    💲 Atualização Rápida de Preços
-                </button>
-            </div>
-
             <div id="listaProdutosPorCategoria"></div>
         </div>
 
@@ -1051,6 +1040,7 @@
             if (dados.pedidoAtual.itens.length === 0) { toast('Adicione pelo menos um item ao pedido!', 'aviso'); return; }
 
             const formaPagamento = document.getElementById('formaPagamentoPedido').value;
+            const usuarioAtual = firebase.auth().currentUser;
 
             dados.pedidos.push({
                 id: Date.now(),
@@ -1061,6 +1051,7 @@
                 endereco: document.getElementById('enderecoCliente').value,
                 observacoes: document.getElementById('observacoesPedido').value,
                 formaPagamento: formaPagamento,
+                criadoPor: usuarioAtual ? (usuarioAtual.displayName || usuarioAtual.email) : '',
                 itens: [...dados.pedidoAtual.itens],
                 total: dados.pedidoAtual.total
             });
@@ -1122,6 +1113,7 @@
                         <div class="pedido-cliente-${pedido.id}">
                             <div class="font-medium">${esc(pedido.cliente)}</div>
                             ${pedido.endereco ? `<div class="text-xs text-gray-500">${esc(pedido.endereco)}</div>` : ''}
+                            ${pedido.criadoPor ? `<div class="text-xs text-gray-400">por ${esc(pedido.criadoPor)}</div>` : ''}
                         </div>
                         <div class="pedido-cliente-edit-${pedido.id}" style="display: none;">
                             <input type="text" class="pedido-cliente-input-${pedido.id} px-2 py-1 border rounded w-full text-sm mb-1"
@@ -1440,7 +1432,7 @@
             const quantidade = parseFloat(document.getElementById('quantidadeIngrediente').value);
             const unidade = document.getElementById('unidadeIngrediente').value;
 
-            if (!nome || !preco || !quantidade) { toast('Preencha todos os campos!', 'aviso'); return; }
+            if (!nome || isNaN(preco) || preco < 0 || isNaN(quantidade) || quantidade <= 0) { toast('Preencha nome, preço e quantidade corretamente!', 'aviso'); return; }
 
             dados.ingredientes.push({ id: Date.now(), nome, preco, quantidade, unidade, precoUnidade: preco / quantidade });
 
@@ -1520,7 +1512,7 @@
             const novaQuantidade = parseFloat(row.querySelector('.ingrediente-quantidade-edit').value);
             const novaUnidade = row.querySelector('.ingrediente-unidade-edit').value;
 
-            if (!novoNome || !novoPreco || !novaQuantidade) { toast('Preencha todos os campos!', 'aviso'); return; }
+            if (!novoNome || isNaN(novoPreco) || novoPreco < 0 || isNaN(novaQuantidade) || novaQuantidade <= 0) { toast('Preencha nome, preço e quantidade corretamente!', 'aviso'); return; }
 
             const ing = dados.ingredientes.find(i => i.id === id);
             if (ing) {
@@ -1939,7 +1931,7 @@
         function adicionarSaida() {
             const descricao = document.getElementById('descricaoSaida').value.trim();
             const valor = parseFloat(document.getElementById('valorSaida').value);
-            if (!descricao || !valor) { toast('Preencha descrição e valor!', 'aviso'); return; }
+            if (!descricao || isNaN(valor) || valor <= 0) { toast('Preencha descrição e valor corretamente!', 'aviso'); return; }
 
             dados.saidas.push({
                 id: Date.now(),
@@ -1947,7 +1939,8 @@
                 descricao: descricao,
                 valor: valor,
                 categoria: document.getElementById('categoriaSaida').value,
-                formaPagamento: document.getElementById('formaPagamentoSaida').value
+                formaPagamento: document.getElementById('formaPagamentoSaida').value,
+                criadoPor: (firebase.auth().currentUser && (firebase.auth().currentUser.displayName || firebase.auth().currentUser.email)) || ''
             });
 
             document.getElementById('descricaoSaida').value = '';
@@ -2014,6 +2007,7 @@
                     </td>
                     <td class="py-3 px-2">
                         <span class="saida-descricao-${saida.id}">${esc(saida.descricao)}</span>
+                        ${saida.criadoPor ? `<div class="text-xs text-gray-400">por ${esc(saida.criadoPor)}</div>` : ''}
                         <input type="text" class="saida-descricao-edit-${saida.id} px-2 py-1 border rounded w-full" value="${esc(saida.descricao)}" style="display: none;">
                     </td>
                     <td class="py-3 px-2">
@@ -2061,7 +2055,7 @@
             const custo = parseFloat(document.getElementById('custoProduto').value);
             const preco = parseFloat(document.getElementById('precoProduto').value);
             const categoria = document.getElementById('categoriaProduto').value;
-            if (!nome || !custo || !preco) { toast('Preencha todos os campos!', 'aviso'); return; }
+            if (!nome || isNaN(custo) || custo < 0 || isNaN(preco) || preco <= 0) { toast('Preencha nome, custo e preço corretamente!', 'aviso'); return; }
 
             dados.produtos.push({ id: Date.now(), nome, custo, preco, categoria });
             document.getElementById('nomeProduto').value = '';
@@ -2149,18 +2143,25 @@
             container.innerHTML = `
                 <div class="bg-white p-6 rounded-lg shadow-lg max-w-2xl w-full mx-4 confirm-pop">
                     <h3 class="text-lg font-semibold mb-1">💲 Atualização Rápida de Preços de Venda</h3>
-                    <p class="text-sm text-gray-500 mb-4">Marque os produtos que quer alterar, ajuste o preço e salve.</p>
+                    <p class="text-sm text-gray-500 mb-4">Filtre por categoria, marque os produtos que quer alterar, ajuste o preço e salve.</p>
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium mb-1">Categoria:</label>
+                        <select id="filtroCategoriaPV" onchange="filtrarProdutosPV()" class="w-full px-3 py-2 border rounded-md">
+                            <option value="">Todas as categorias</option>
+                            ${dados.configuracoes.categorias.map(cat => `<option value="${esc(cat)}">${esc(cat)}</option>`).join('')}
+                        </select>
+                    </div>
                     <div class="flex items-center gap-2 mb-4 p-3 bg-gray-50 rounded-lg flex-wrap">
                         <span class="text-sm font-medium">Ajustar marcados em:</span>
                         <input type="number" id="ajustePercentual" step="1" placeholder="ex: 10 ou -5" class="w-24 px-2 py-1 border rounded text-right text-sm">
                         <span class="text-sm text-gray-500">%</span>
                         <button onclick="aplicarAjustePercentual()" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">Aplicar aos marcados</button>
-                        <button onclick="marcarTodosPrecoVenda(true)" class="ml-auto text-xs text-blue-600 hover:underline">Marcar todos</button>
+                        <button onclick="marcarTodosPrecoVenda(true)" class="ml-auto text-xs text-blue-600 hover:underline">Marcar visíveis</button>
                         <button onclick="marcarTodosPrecoVenda(false)" class="text-xs text-gray-500 hover:underline">Desmarcar todos</button>
                     </div>
-                    <div class="space-y-2 max-h-80 overflow-y-auto">
+                    <div id="listaPrecoVenda" class="space-y-2 max-h-80 overflow-y-auto">
                         ${dados.produtos.map(p => `
-                            <div class="flex items-center gap-2 p-2 border rounded-lg">
+                            <div class="flex items-center gap-2 p-2 border rounded-lg pv-row" data-categoria="${esc(p.categoria)}">
                                 <input type="checkbox" class="pv-check w-4 h-4" data-id="${p.id}">
                                 <div class="flex-1 min-w-0">
                                     <p class="font-medium text-sm truncate">${esc(p.nome)}</p>
@@ -2170,6 +2171,7 @@
                             </div>
                         `).join('')}
                     </div>
+                    <p id="pvVazio" class="text-sm text-gray-500 text-center py-4" style="display:none;">Nenhum produto nessa categoria.</p>
                     <div class="flex gap-2 mt-4">
                         <button onclick="salvarAtualizacaoPrecosVenda()" class="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">💾 Salvar Marcados</button>
                         <button onclick="fecharModal('modalPrecosVenda')" class="flex-1 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">✖ Cancelar</button>
@@ -2179,8 +2181,24 @@
             document.body.appendChild(container);
         }
 
+        function filtrarProdutosPV() {
+            const categoria = document.getElementById('filtroCategoriaPV').value;
+            const linhas = document.querySelectorAll('.pv-row');
+            let visiveis = 0;
+            linhas.forEach(linha => {
+                const mostrar = !categoria || linha.dataset.categoria === categoria;
+                linha.style.display = mostrar ? 'flex' : 'none';
+                if (mostrar) visiveis++;
+            });
+            document.getElementById('pvVazio').style.display = visiveis === 0 ? 'block' : 'none';
+        }
+
         function marcarTodosPrecoVenda(marcar) {
-            document.querySelectorAll('.pv-check').forEach(c => c.checked = marcar);
+            document.querySelectorAll('.pv-row').forEach(linha => {
+                if (linha.style.display === 'none') return;
+                const check = linha.querySelector('.pv-check');
+                if (check) check.checked = marcar;
+            });
         }
 
         function aplicarAjustePercentual() {
@@ -2477,7 +2495,31 @@
         }
 
         async function limparDados() {
-            if (await confirmarAcao('ATENÇÃO: Isso apagará TODOS os dados. Tem certeza?')) {
+            if (await confirmarAcao('ATENÇÃO: Isso apagará TODOS os dados — pedidos, produtos, ingredientes e saídas — em todos os aparelhos conectados (a nuvem também é limpa). Tem certeza?')) {
+                const dadosZerados = {
+                    produtos: [],
+                    pedidos: [],
+                    saidas: [],
+                    ingredientes: [],
+                    receitas: [],
+                    configuracoes: {
+                        nome: dados.configuracoes.nome,
+                        telefone: dados.configuracoes.telefone,
+                        endereco: dados.configuracoes.endereco,
+                        meta: dados.configuracoes.meta,
+                        categorias: ['Pizza', 'Bebida', 'Sobremesa', 'Outros'],
+                        categoriasSaidas: ['Ingredientes', 'Aluguel', 'Funcionários', 'Energia/Água', 'Gás', 'Marketing', 'Equipamentos', 'Outros']
+                    },
+                    pedidoAtual: { itens: [], total: 0 }
+                };
+                try {
+                    if (syncDocRef) {
+                        await syncDocRef.set({ dados: dadosZerados, atualizadoEm: new Date().toISOString() });
+                    }
+                } catch (e) {
+                    console.error('Erro ao limpar dados na nuvem:', e);
+                    toast('Dados locais limpos, mas houve erro ao limpar a nuvem. Verifique a conexão.', 'erro');
+                }
                 localStorage.removeItem('pizzaria_dados');
                 location.reload();
             }
@@ -2502,6 +2544,11 @@
                 });
                 document.getElementById('novaCategoriaSaida').addEventListener('keypress', e => {
                     if (e.key === 'Enter') adicionarCategoriaSaida();
+                });
+
+                window.addEventListener('offline', () => statusSync('🔴 Sem conexão com a internet', 'bg-red-100 text-red-700'));
+                window.addEventListener('online', () => {
+                    if (firebase.auth().currentUser) statusSync('🟡 Reconectando...', 'bg-yellow-100 text-yellow-700');
                 });
             } catch (error) {
                 console.error('Erro na inicialização:', error);
