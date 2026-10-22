@@ -2104,15 +2104,38 @@
                                         const lucro = produto.preco - produto.custo;
                                         return `
                                             <tr class="border-b hover:bg-gray-50">
-                                                <td class="py-3 px-2 font-medium">${esc(produto.nome)}</td>
-                                                <td class="py-3 px-2 text-right">${formatarMoeda(produto.custo)}</td>
-                                                <td class="py-3 px-2 text-right font-semibold">${formatarMoeda(produto.preco)}</td>
+                                                <td class="py-3 px-2 font-medium">
+                                                    <span class="prod-nome-${produto.id}">${esc(produto.nome)}</span>
+                                                    <div class="prod-nome-edit-${produto.id}" style="display: none;">
+                                                        <input type="text" class="prod-nome-input-${produto.id} px-2 py-1 border rounded w-full mb-1 font-normal" value="${esc(produto.nome)}"
+                                                               onkeypress="if(event.key==='Enter') salvarProduto(${produto.id})">
+                                                        <select class="prod-cat-input-${produto.id} px-2 py-1 border rounded w-full text-sm font-normal">
+                                                            ${dados.configuracoes.categorias.map(cat =>
+                                                                `<option value="${esc(cat)}" ${produto.categoria === cat ? 'selected' : ''}>${esc(cat)}</option>`).join('')}
+                                                        </select>
+                                                    </div>
+                                                </td>
+                                                <td class="py-3 px-2 text-right">
+                                                    <span class="prod-custo-${produto.id}">${formatarMoeda(produto.custo)}</span>
+                                                    <input type="number" step="0.01" class="prod-custo-edit-${produto.id} px-2 py-1 border rounded w-24 text-right" value="${produto.custo}"
+                                                           onkeypress="if(event.key==='Enter') salvarProduto(${produto.id})" style="display: none;">
+                                                </td>
+                                                <td class="py-3 px-2 text-right font-semibold">
+                                                    <span class="prod-preco-${produto.id}">${formatarMoeda(produto.preco)}</span>
+                                                    <input type="number" step="0.01" class="prod-preco-edit-${produto.id} px-2 py-1 border rounded w-24 text-right font-normal" value="${produto.preco}"
+                                                           onkeypress="if(event.key==='Enter') salvarProduto(${produto.id})" style="display: none;">
+                                                </td>
                                                 <td class="py-3 px-2 text-right">
                                                     <span class="font-semibold ${classeMargem(margem)}">${margem.toFixed(1)}%</span>
                                                 </td>
                                                 <td class="py-3 px-2 text-right font-semibold text-green-600">${formatarMoeda(lucro)}</td>
                                                 <td class="py-3 px-2 text-center">
-                                                    <button onclick="excluirProduto(${produto.id})" class="text-red-600 hover:bg-red-100 p-1 rounded">🗑️</button>
+                                                    <div class="flex gap-1 justify-center">
+                                                        <button onclick="editarProduto(${produto.id})" class="prod-btn-edit-${produto.id} text-blue-600 hover:bg-blue-100 p-1 rounded" title="Editar">✏️</button>
+                                                        <button onclick="salvarProduto(${produto.id})" class="prod-btn-save-${produto.id} text-green-600 hover:bg-green-100 p-1 rounded" title="Salvar" style="display: none;">💾</button>
+                                                        <button onclick="cancelarEdicaoProduto()" class="prod-btn-cancel-${produto.id} text-gray-600 hover:bg-gray-100 p-1 rounded" title="Cancelar" style="display: none;">✖</button>
+                                                        <button onclick="excluirProduto(${produto.id})" class="text-red-600 hover:bg-red-100 p-1 rounded" title="Excluir">🗑️</button>
+                                                    </div>
                                                 </td>
                                             </tr>`;
                                     }).join('')}
@@ -2123,6 +2146,55 @@
             });
             document.getElementById('listaProdutosPorCategoria').innerHTML = html;
         }
+
+        // Edição direta de produto (nome, categoria, custo e preço)
+        function editarProduto(id) {
+            ['nome', 'custo', 'preco'].forEach(campo => {
+                document.querySelector(`.prod-${campo}-${id}`).style.display = 'none';
+                document.querySelector(`.prod-${campo}-edit-${id}`).style.display = 'block';
+            });
+            document.querySelector(`.prod-btn-edit-${id}`).style.display = 'none';
+            document.querySelector(`.prod-btn-save-${id}`).style.display = 'inline-block';
+            document.querySelector(`.prod-btn-cancel-${id}`).style.display = 'inline-block';
+            const campoPreco = document.querySelector(`.prod-preco-edit-${id}`);
+            if (campoPreco) { campoPreco.focus(); campoPreco.select(); }
+        }
+
+        function salvarProduto(id) {
+            const novoNome = document.querySelector(`.prod-nome-input-${id}`).value.trim();
+            const novaCategoria = document.querySelector(`.prod-cat-input-${id}`).value;
+            const novoCusto = parseFloat(document.querySelector(`.prod-custo-edit-${id}`).value);
+            const novoPreco = parseFloat(document.querySelector(`.prod-preco-edit-${id}`).value);
+
+            if (!novoNome || isNaN(novoCusto) || novoCusto < 0 || isNaN(novoPreco) || novoPreco <= 0) {
+                toast('Preencha nome, custo e preço corretamente!', 'aviso');
+                return;
+            }
+
+            const produto = dados.produtos.find(p => p.id === id);
+            if (!produto) return;
+
+            // A receita de mesmo nome (se existir) acompanha o nome, a categoria e o preço de venda
+            const receita = dados.receitas.find(r => r.nome === produto.nome);
+
+            produto.nome = novoNome;
+            produto.categoria = novaCategoria;
+            produto.custo = novoCusto;
+            produto.preco = novoPreco;
+
+            if (receita) {
+                receita.nome = novoNome;
+                receita.categoria = novaCategoria;
+                receita.precoVenda = novoPreco;
+            }
+
+            salvarDados();
+            atualizarProdutos();
+            atualizarListaReceitas();
+            toast(`Produto "${novoNome}" atualizado!`, 'sucesso');
+        }
+
+        function cancelarEdicaoProduto() { atualizarListaProdutos(); }
 
         async function excluirProduto(id) {
             if (await confirmarAcao('Tem certeza que deseja excluir este produto?')) {
