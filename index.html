@@ -608,6 +608,14 @@
             return new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
         }
 
+        // Quantidade com suporte a meia unidade: 0.5 -> "½", 1.5 -> "1½"
+        function formatarQuantidade(q) {
+            const inteiro = Math.floor(q);
+            const meia = q - inteiro >= 0.5;
+            if (!meia) return String(inteiro);
+            return inteiro === 0 ? '½' : `${inteiro}½`;
+        }
+
         function fecharModal(id) {
             const m = document.getElementById(id);
             if (m) m.remove();
@@ -952,7 +960,7 @@
                 ? top.map(p => `
                     <div class="flex justify-between py-2">
                         <span>${esc(p.nome)}</span>
-                        <span class="bg-gray-100 px-2 py-1 rounded text-sm">${p.quantidade} vendas</span>
+                        <span class="bg-gray-100 px-2 py-1 rounded text-sm">${formatarQuantidade(p.quantidade)} vendas</span>
                     </div>`).join('')
                 : '<p class="text-gray-500 text-center py-4">Nenhum pedido no período</p>';
         }
@@ -973,10 +981,12 @@
                                         <p class="font-medium text-sm">${esc(produto.nome)}</p>
                                         <p class="text-sm text-green-600 font-semibold">${formatarMoeda(produto.preco)}</p>
                                     </div>
-                                    <input type="number" min="1" placeholder="Qtd" class="w-16 px-2 py-1 border rounded text-center"
+                                    <input type="number" min="0.5" step="0.5" placeholder="Qtd" class="w-16 px-2 py-1 border rounded text-center"
                                            onkeypress="if(event.key==='Enter') adicionarItemPedido(${produto.id}, this)">
                                     <button onclick="adicionarItemPedido(${produto.id}, this.previousElementSibling)"
                                             class="p-1 bg-orange-600 text-white rounded hover:bg-orange-700">➕</button>
+                                    <button onclick="adicionarMeiaUnidade(${produto.id})"
+                                            class="px-2 py-1 bg-orange-100 text-orange-700 rounded hover:bg-orange-200 font-semibold" title="Adicionar meia unidade (pizza meio a meio)">½</button>
                                 </div>
                             `).join('')}
                         </div>
@@ -987,8 +997,9 @@
         }
 
         function adicionarItemPedido(produtoId, input) {
-            const qtd = parseInt(input.value);
-            if (!qtd || qtd <= 0) return;
+            const qtd = parseFloat(input.value);
+            if (isNaN(qtd) || qtd <= 0) return;
+            if ((qtd * 2) % 1 !== 0) { toast('Use quantidades inteiras ou meia unidade (0,5).', 'aviso'); return; }
             const produto = dados.produtos.find(p => p.id == produtoId);
             if (!produto) return;
 
@@ -1017,7 +1028,7 @@
                 <div class="flex justify-between items-center py-2 border-b">
                     <div class="flex-1">
                         <span class="font-medium">${esc(item.nome)}</span>
-                        <span class="text-gray-500 ml-2">x ${item.quantidade}</span>
+                        <span class="text-gray-500 ml-2">x ${formatarQuantidade(item.quantidade)}</span>
                     </div>
                     <div class="flex items-center gap-2">
                         <span class="font-semibold">${formatarMoeda(item.subtotal)}</span>
@@ -1026,6 +1037,12 @@
                 </div>
             `).join('');
             document.getElementById('totalPedido').textContent = formatarMoeda(dados.pedidoAtual.total);
+        }
+
+        // Meia unidade com um clique (pizza meio a meio: adicione ½ de cada sabor)
+        function adicionarMeiaUnidade(produtoId) {
+            adicionarItemPedido(produtoId, { value: '0.5' });
+            toast('½ unidade adicionada ao pedido.', 'info');
         }
 
         function removerItemPedido(index) {
@@ -1140,7 +1157,7 @@
                     </td>
                     <td class="py-3 px-2 text-sm">
                         <div class="pedido-itens-${pedido.id}">
-                            ${pedido.itens.map(item => `${esc(item.nome)} (${item.quantidade})`).join(', ')}
+                            ${pedido.itens.map(item => `${esc(item.nome)} (${formatarQuantidade(item.quantidade)})`).join(', ')}
                         </div>
                         <div class="pedido-itens-edit-${pedido.id}" style="display: none;">
                             <button onclick="editarItensPedido(${pedido.id})" class="text-blue-600 hover:bg-blue-100 px-2 py-1 rounded text-xs">
@@ -1243,7 +1260,7 @@
             return window.pedidoEditandoItens.itens.map((item, index) => `
                 <div class="flex items-center gap-2 p-2 bg-gray-50 rounded" data-index="${index}">
                     <span class="flex-1">${esc(item.nome)}</span>
-                    <input type="number" min="1" value="${item.quantidade}"
+                    <input type="number" min="0.5" step="0.5" value="${item.quantidade}"
                            class="w-16 px-2 py-1 border rounded text-center quantidade-item"
                            onchange="atualizarQuantidadeItem(this, ${index})">
                     <span class="w-20 text-right">${formatarMoeda(item.precoUnitario)}</span>
@@ -1275,7 +1292,7 @@
                                 <option value="">Selecionar produto</option>
                                 ${dados.produtos.map(p => `<option value="${p.id}">${esc(p.nome)} - ${formatarMoeda(p.preco)}</option>`).join('')}
                             </select>
-                            <input type="number" id="novaQuantidadeModal" min="1" placeholder="Qtd" class="w-20 px-2 py-2 border rounded text-center" onkeypress="if(event.key==='Enter') adicionarItemModal()">
+                            <input type="number" id="novaQuantidadeModal" min="0.5" step="0.5" placeholder="Qtd" class="w-20 px-2 py-2 border rounded text-center" onkeypress="if(event.key==='Enter') adicionarItemModal()">
                             <button onclick="adicionarItemModal()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">➕</button>
                         </div>
                     </div>
@@ -1294,7 +1311,13 @@
 
         function atualizarQuantidadeItem(input, index) {
             const item = window.pedidoEditandoItens.itens[index];
-            item.quantidade = parseInt(input.value) || 1;
+            const nova = parseFloat(input.value);
+            if (isNaN(nova) || nova <= 0 || (nova * 2) % 1 !== 0) {
+                toast('Use quantidades inteiras ou meia unidade (0,5).', 'aviso');
+                input.value = item.quantidade;
+                return;
+            }
+            item.quantidade = nova;
             item.subtotal = item.precoUnitario * item.quantidade;
             input.closest('[data-index]').querySelector('.subtotal-item').textContent = formatarMoeda(item.subtotal);
             atualizarTotalModal();
@@ -1308,7 +1331,7 @@
 
         function adicionarItemModal() {
             const produtoId = document.getElementById('novoProdutoModal').value;
-            const quantidade = parseInt(document.getElementById('novaQuantidadeModal').value);
+            const quantidade = Math.round(parseFloat(document.getElementById('novaQuantidadeModal').value) * 2) / 2;
             if (!produtoId || !quantidade || quantidade <= 0) { toast('Selecione um produto e quantidade válida!', 'aviso'); return; }
             const produto = dados.produtos.find(p => p.id == produtoId);
             if (!produto) return;
