@@ -340,8 +340,8 @@
                 <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
                     <h3 class="text-lg font-semibold">Clientes (<span id="qtdClientes">0</span>)</h3>
                     <div class="flex gap-2 flex-wrap">
-                        <input type="text" id="buscaCliente" placeholder="🔎 Buscar nome ou telefone" oninput="atualizarListaClientes()" class="px-3 py-2 border rounded-md text-sm">
-                        <select id="filtroCliente" onchange="atualizarListaClientes()" class="px-3 py-2 border rounded-md text-sm">
+                        <input type="text" id="buscaCliente" placeholder="🔎 Buscar nome ou telefone" oninput="atualizarClientes()" class="px-3 py-2 border rounded-md text-sm">
+                        <select id="filtroCliente" onchange="atualizarClientes()" class="px-3 py-2 border rounded-md text-sm">
                             <option value="todos">Todos</option>
                             <option value="devedores">Com valor em aberto</option>
                             <option value="sumidos">Sumidos (+21 dias sem pedir)</option>
@@ -497,6 +497,37 @@
                         📝 Criar Receita
                     </button>
                 </div>
+
+                <!-- Busca, filtros e ordenação das receitas -->
+                <div class="grid grid-cols-2 md:grid-cols-12 gap-2 mb-3 p-3 bg-gray-50 rounded-lg">
+                    <input type="text" id="buscaReceita" placeholder="🔎 Buscar receita" oninput="mudarFiltroReceitas()"
+                           class="col-span-2 md:col-span-3 px-3 py-2 border rounded-md text-sm">
+                    <select id="filtroCategoriaReceita" onchange="mudarFiltroReceitas()" class="md:col-span-2 px-3 py-2 border rounded-md text-sm">
+                        <option value="">Todas as categorias</option>
+                    </select>
+                    <select id="filtroMostrarReceita" onchange="mudarFiltroReceitas()" class="md:col-span-2 px-3 py-2 border rounded-md text-sm">
+                        <option value="">Mostrar todas</option>
+                        <option value="margem50">Margem abaixo de 50%</option>
+                        <option value="margem30">Margem abaixo de 30%</option>
+                        <option value="semPreco">Sem preço de venda</option>
+                        <option value="semIngredientes">Sem ingredientes</option>
+                        <option value="semProduto">Não enviadas p/ Produtos</option>
+                    </select>
+                    <select id="ordemCampoReceita" onchange="mudarOrdemReceitas(this.value)" class="md:col-span-3 px-3 py-2 border rounded-md text-sm">
+                        <option value="manual">Ordem manual (arrastar)</option>
+                        <option value="nome">Nome (A-Z)</option>
+                        <option value="categoria">Categoria</option>
+                        <option value="custo">Custo</option>
+                        <option value="preco">Preço de venda</option>
+                        <option value="margem">Margem</option>
+                        <option value="lucro">Lucro por unidade (R$)</option>
+                        <option value="ingredientes">Nº de ingredientes</option>
+                    </select>
+                    <button id="ordemDirReceita" onclick="inverterOrdemReceitas()" title="Inverter ordem"
+                            class="md:col-span-2 px-3 py-2 border rounded-md text-sm bg-white hover:bg-gray-100">⬆️ Menor → maior</button>
+                </div>
+                <p id="resumoFiltroReceitas" class="text-xs text-gray-500 mb-2"></p>
+
                 <div id="listaReceitas"></div>
             </div>
 
@@ -1652,12 +1683,14 @@
         }
 
         function atualizarClientes() {
-            const busca = (document.getElementById('buscaCliente').value || '').trim().toLowerCase();
+            // Ignora maiúsculas e acentos: "joao" encontra "João"
+            const semAcento = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+            const busca = semAcento((document.getElementById('buscaCliente').value || '').trim());
             const buscaTel = normTel(busca);
             const filtro = document.getElementById('filtroCliente').value;
 
             let lista = dados.clientes.map(c => ({ c, est: estatisticasCliente(c) }));
-            if (busca) lista = lista.filter(({ c }) => c.nome.toLowerCase().includes(busca) || (buscaTel && normTel(c.telefone).includes(buscaTel)));
+            if (busca) lista = lista.filter(({ c }) => semAcento(c.nome).includes(busca) || (buscaTel && normTel(c.telefone).includes(buscaTel)));
             if (filtro === 'devedores') lista = lista.filter(({ est }) => est.emAberto > 0);
             if (filtro === 'sumidos') lista = lista.filter(({ est }) => clienteSumido(est));
             lista.sort((a, b) => b.est.qtd - a.est.qtd || a.c.nome.localeCompare(b.c.nome));
@@ -2645,11 +2678,131 @@
             return null;
         }
 
+        // --- Busca, filtro e ordenação das receitas (preferência guardada só neste aparelho) ---
+        let ordemReceitas = { campo: 'manual', dir: 'asc' };
+        try { ordemReceitas = { ...ordemReceitas, ...JSON.parse(localStorage.getItem('pizzaria_ordem_receitas') || '{}') }; } catch (e) { }
+
+        const ORDEM_PADRAO_DIR = { nome: 'asc', categoria: 'asc', custo: 'asc', preco: 'desc', margem: 'desc', lucro: 'desc', ingredientes: 'desc' };
+
+        function mudarOrdemReceitas(campo) {
+            if (campo === ordemReceitas.campo && campo !== 'manual') {
+                ordemReceitas.dir = ordemReceitas.dir === 'asc' ? 'desc' : 'asc';
+            } else {
+                ordemReceitas.campo = campo;
+                ordemReceitas.dir = ORDEM_PADRAO_DIR[campo] || 'asc';
+            }
+            try { localStorage.setItem('pizzaria_ordem_receitas', JSON.stringify(ordemReceitas)); } catch (e) { }
+            atualizarListaReceitas();
+        }
+
+        function inverterOrdemReceitas() {
+            if (ordemReceitas.campo === 'manual') { toast('Escolha um "Ordenar por" primeiro.', 'info'); return; }
+            mudarOrdemReceitas(ordemReceitas.campo);
+        }
+
+        function mudarFiltroReceitas() { atualizarListaReceitas(); }
+
+        function valorOrdemReceita(r, campo) {
+            const mr = margemRealReceita(r);
+            switch (campo) {
+                case 'nome': return r.nome || '';
+                case 'categoria': return r.categoria || '';
+                case 'custo': return r.custoTotal || 0;
+                case 'preco': return r.precoVenda > 0 ? r.precoVenda : null;
+                case 'margem': return mr;
+                case 'lucro': return r.precoVenda > 0 ? r.precoVenda - (r.custoTotal || 0) : null;
+                case 'ingredientes': return r.ingredientes.length;
+            }
+            return 0;
+        }
+
+        function receitasVisiveis() {
+            const semAcento = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+            const busca = semAcento(document.getElementById('buscaReceita').value.trim());
+            const categoria = document.getElementById('filtroCategoriaReceita').value;
+            const mostrar = document.getElementById('filtroMostrarReceita').value;
+
+            let lista = dados.receitas.filter(r => {
+                if (busca && !semAcento(r.nome).includes(busca)) return false;
+                if (categoria && r.categoria !== categoria) return false;
+                const mr = margemRealReceita(r);
+                if (mostrar === 'margem50' && !(mr !== null && mr < 50)) return false;
+                if (mostrar === 'margem30' && !(mr !== null && mr < 30)) return false;
+                if (mostrar === 'semPreco' && r.precoVenda > 0) return false;
+                if (mostrar === 'semIngredientes' && r.ingredientes.length > 0) return false;
+                if (mostrar === 'semProduto' && dados.produtos.some(p => p.receitaId === r.id || p.nome === r.nome)) return false;
+                return true;
+            });
+
+            const { campo, dir } = ordemReceitas;
+            if (campo !== 'manual') {
+                const fator = dir === 'asc' ? 1 : -1;
+                lista = [...lista].sort((a, b) => {
+                    const va = valorOrdemReceita(a, campo), vb = valorOrdemReceita(b, campo);
+                    // Receitas sem valor (ex.: sem preço) ficam sempre no fim
+                    if (va === null && vb === null) return 0;
+                    if (va === null) return 1;
+                    if (vb === null) return -1;
+                    const cmp = typeof va === 'string'
+                        ? va.localeCompare(vb, 'pt-BR', { sensitivity: 'base', numeric: true })
+                        : va - vb;
+                    return cmp * fator || a.nome.localeCompare(b.nome, 'pt-BR');
+                });
+            }
+            return lista;
+        }
+
+        function atualizarControlesReceitas(qtdVisiveis) {
+            const selCat = document.getElementById('filtroCategoriaReceita');
+            const catAtual = selCat.value;
+            const cats = dados.configuracoes.categorias;
+            selCat.innerHTML = '<option value="">Todas as categorias</option>' +
+                cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+            selCat.value = cats.includes(catAtual) ? catAtual : '';
+            const selOrdem = document.getElementById('ordemCampoReceita');
+            selOrdem.value = ordemReceitas.campo;
+            const btnDir = document.getElementById('ordemDirReceita');
+            const ehTexto = ['nome', 'categoria'].includes(ordemReceitas.campo);
+            if (ordemReceitas.campo === 'manual') {
+                btnDir.textContent = '↕️ Sem ordenação';
+                btnDir.classList.add('text-gray-400');
+            } else {
+                btnDir.classList.remove('text-gray-400');
+                btnDir.textContent = ordemReceitas.dir === 'asc'
+                    ? (ehTexto ? '⬆️ A → Z' : '⬆️ Menor → maior')
+                    : (ehTexto ? '⬇️ Z → A' : '⬇️ Maior → menor');
+            }
+            const total = dados.receitas.length;
+            document.getElementById('resumoFiltroReceitas').textContent =
+                total && qtdVisiveis !== total ? `Mostrando ${qtdVisiveis} de ${total} receitas.` : '';
+        }
+
+        function setaOrdem(campo) {
+            if (ordemReceitas.campo !== campo) return '<span class="text-gray-300">↕</span>';
+            return ordemReceitas.dir === 'asc' ? '▲' : '▼';
+        }
+
+        function thOrdenavel(campo, rotulo, alinhamento) {
+            return `<th class="text-${alinhamento} py-3 px-2 cursor-pointer select-none hover:bg-gray-100" onclick="mudarOrdemReceitas('${campo}')" title="Ordenar por ${rotulo}">${rotulo} <span class="text-xs">${setaOrdem(campo)}</span></th>`;
+        }
+
         function atualizarListaReceitas() {
             if (dados.receitas.length === 0) {
+                atualizarControlesReceitas(0);
                 document.getElementById('listaReceitas').innerHTML = '<p class="text-gray-500 text-center py-4">Nenhuma receita cadastrada</p>';
                 return;
             }
+
+            const visiveis = receitasVisiveis();
+            atualizarControlesReceitas(visiveis.length);
+
+            if (visiveis.length === 0) {
+                document.getElementById('listaReceitas').innerHTML = '<p class="text-gray-500 text-center py-4">Nenhuma receita encontrada com esses filtros.</p>';
+                return;
+            }
+
+            // Arrastar só faz sentido na ordem manual e com a lista completa
+            const podeArrastar = ordemReceitas.campo === 'manual' && visiveis.length === dados.receitas.length;
 
             document.getElementById('listaReceitas').innerHTML = `
                 <div class="overflow-x-auto">
@@ -2657,23 +2810,25 @@
                         <thead>
                             <tr class="border-b bg-gray-50">
                                 <th class="text-left py-3 px-2">🔄</th>
-                                <th class="text-left py-3 px-2">Produto</th>
-                                <th class="text-left py-3 px-2">Categoria</th>
-                                <th class="text-right py-3 px-2">Custo</th>
-                                <th class="text-right py-3 px-2">Preço Venda</th>
-                                <th class="text-right py-3 px-2">Margem</th>
-                                <th class="text-right py-3 px-2">Ingredientes</th>
+                                ${thOrdenavel('nome', 'Produto', 'left')}
+                                ${thOrdenavel('categoria', 'Categoria', 'left')}
+                                ${thOrdenavel('custo', 'Custo', 'right')}
+                                ${thOrdenavel('preco', 'Preço Venda', 'right')}
+                                ${thOrdenavel('margem', 'Margem', 'right')}
+                                ${thOrdenavel('ingredientes', 'Ingredientes', 'right')}
                                 <th class="text-center py-3 px-2">Ações</th>
                             </tr>
                         </thead>
                         <tbody id="corpoTabelaReceitas">
-                            ${dados.receitas.map(r => {
+                            ${visiveis.map(r => {
                                 const mr = margemRealReceita(r);
                                 const m = mr !== null ? mr : (r.margem || 60);
                                 return `
-                                <tr class="border-b hover:bg-gray-50" draggable="true">
+                                <tr class="border-b hover:bg-gray-50" ${podeArrastar ? 'draggable="true"' : ''}>
                                     <td class="py-3 px-2">
-                                        <span class="drag-handle-receitas cursor-move text-gray-400 hover:text-gray-600" title="Arrastar para reordenar">⋮⋮</span>
+                                        ${podeArrastar
+                                            ? '<span class="drag-handle-receitas cursor-move text-gray-400 hover:text-gray-600" title="Arrastar para reordenar">⋮⋮</span>'
+                                            : '<span class="drag-handle-receitas text-gray-200" title="Para arrastar, escolha Ordem manual e limpe os filtros">⋮⋮</span>'}
                                     </td>
                                     <td class="py-3 px-2 font-medium">
                                         <span class="receita-nome-${r.id}">${esc(r.nome)}</span>
@@ -2703,7 +2858,7 @@
                     </table>
                 </div>
             `;
-            inicializarDragDropReceitas();
+            if (podeArrastar) inicializarDragDropReceitas();
         }
 
         function editarReceita(id) {
