@@ -28,6 +28,14 @@
         @keyframes pulseBadge { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
         #loginGate { transition: opacity .3s ease; }
 
+        /* ---------- Busca, filtros e ordenação ---------- */
+        .filtro-oculto, .busca-oculto { display: none !important; }
+        .sem-arrastar [class*="drag-handle"] { opacity: .25; cursor: not-allowed !important; }
+        th.th-ordenavel { cursor: pointer; user-select: none; }
+        th.th-ordenavel:hover { background: #f3f4f6; }
+        th .seta-ordem { font-size: .7rem; margin-left: 2px; }
+        .chip-cat { transition: background-color .15s ease, color .15s ease; }
+
         /* ---------- Toque mais rápido e fluido ---------- */
         html { -webkit-tap-highlight-color: transparent; scroll-behavior: smooth; }
         button, a, select, input[type="checkbox"] { touch-action: manipulation; }
@@ -1195,7 +1203,7 @@
         // Coloca o nome da coluna em cada célula; o CSS usa isso para montar os cartões no celular
         function prepararTabelasMobile() {
             document.querySelectorAll('.container table').forEach(tabela => {
-                const titulos = [...tabela.querySelectorAll('thead th')].map(th => th.textContent.trim());
+                const titulos = [...tabela.querySelectorAll('thead th')].map(th => th.dataset.titulo || th.textContent.trim());
                 if (!titulos.length) return;
                 tabela.classList.add('cards');
                 const idxPrincipal = titulos.findIndex(t => COLUNAS_PRINCIPAIS.includes(t));
@@ -1394,7 +1402,7 @@
                         <td class="py-3 px-2 text-right font-semibold">${formatarNumero(ing.estoque)} ${esc(ing.unidade)}</td>
                         <td class="py-3 px-2 text-right">${ing.estoqueMinimo ? formatarNumero(ing.estoqueMinimo) + ' ' + esc(ing.unidade) : '-'}</td>
                         <td class="py-3 px-2 text-right">${md > 0 ? formatarNumero(md) + ' ' + esc(ing.unidade) : '-'}</td>
-                        <td class="py-3 px-2 text-right">${textoDias(st.dias)}</td>
+                        <td class="py-3 px-2 text-right" data-ordem="${isFinite(st.dias) ? st.dias : 999999}">${textoDias(st.dias)}</td>
                         <td class="py-3 px-2 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${rot.classe}">${rot.texto}</span></td>
                         <td class="py-3 px-2 text-center">
                             <div class="flex gap-1 justify-center">
@@ -1973,20 +1981,129 @@
         // =====================================================================
         // PEDIDOS
         // =====================================================================
+        // --- Busca, categoria e ordenação na escolha de produtos do pedido ---
+        let filtroPedido = { busca: '', categoria: '', ordem: 'padrao' };
+        try { filtroPedido.ordem = localStorage.getItem('pizzaria_ordem_pedido') || 'padrao'; } catch (e) { }
+
+        function vendasPorProduto() {
+            const mapa = {};
+            dados.pedidos.forEach(p => (p.itens || []).forEach(i => { mapa[i.produtoId] = (mapa[i.produtoId] || 0) + (i.quantidade || 0); }));
+            return mapa;
+        }
+
+        function mudarOrdemProdutosPedido(ordem) {
+            filtroPedido.ordem = ordem;
+            try { localStorage.setItem('pizzaria_ordem_pedido', ordem); } catch (e) { }
+            aplicarFiltroProdutosPedido();
+        }
+
+        function filtrarCategoriaPedido(cat) {
+            filtroPedido.categoria = filtroPedido.categoria === cat ? '' : cat;
+            aplicarFiltroProdutosPedido();
+        }
+
+        function enterBuscaProdutoPedido() {
+            const visiveis = [...document.querySelectorAll('#produtosPorCategoria .card-produto-pedido:not(.filtro-oculto)')]
+                .filter(c => !c.closest('.filtro-oculto'));
+            if (visiveis.length === 1) {
+                const card = visiveis[0];
+                const qtd = card.querySelector('input[type="number"]');
+                adicionarItemPedido(card.dataset.id, { value: (qtd && qtd.value) || '1' });
+                if (qtd) qtd.value = '';
+                toast(`+ ${card.dataset.nomeOriginal} adicionado`, 'sucesso');
+                const busca = document.getElementById('buscaProdutoPedido');
+                busca.value = ''; filtroPedido.busca = '';
+                aplicarFiltroProdutosPedido();
+                busca.focus();
+            } else if (visiveis.length > 1) {
+                const qtd = visiveis[0].querySelector('input[type="number"]');
+                if (qtd) qtd.focus();
+            }
+        }
+
+        function aplicarFiltroProdutosPedido() {
+            const termo = semAcentoBusca(filtroPedido.busca.trim());
+            const comparar = {
+                nome: (a, b) => a.dataset.nome.localeCompare(b.dataset.nome, 'pt-BR', { sensitivity: 'base', numeric: true }),
+                menorPreco: (a, b) => a.dataset.preco - b.dataset.preco,
+                maiorPreco: (a, b) => b.dataset.preco - a.dataset.preco,
+                maisPedidos: (a, b) => b.dataset.vendas - a.dataset.vendas
+            }[filtroPedido.ordem];
+            let total = 0;
+            document.querySelectorAll('#produtosPorCategoria [data-grupo-cat]').forEach(grupo => {
+                const grade = grupo.querySelector('.grade-produtos-pedido');
+                const cards = [...grade.children];
+                let vis = 0;
+                cards.forEach(card => {
+                    const ok = (!filtroPedido.categoria || grupo.dataset.grupoCat === filtroPedido.categoria) &&
+                        (!termo || card.dataset.nome.includes(termo));
+                    card.classList.toggle('filtro-oculto', !ok);
+                    if (ok) vis++;
+                    const info = card.querySelector('.vendas-info');
+                    if (info) info.classList.toggle('hidden', filtroPedido.ordem !== 'maisPedidos');
+                });
+                cards.sort((a, b) => (comparar ? comparar(a, b) : 0) || a.dataset.pos - b.dataset.pos)
+                    .forEach(c => grade.appendChild(c));
+                grupo.classList.toggle('filtro-oculto', vis === 0);
+                total += vis;
+            });
+            document.querySelectorAll('#chipsCategoriaPedido .chip-cat').forEach(b => {
+                const ativo = b.dataset.cat === filtroPedido.categoria;
+                b.classList.toggle('bg-orange-600', ativo);
+                b.classList.toggle('text-white', ativo);
+                b.classList.toggle('border-orange-600', ativo);
+                b.classList.toggle('bg-white', !ativo);
+                b.classList.toggle('text-gray-700', !ativo);
+            });
+            const vazio = document.getElementById('semResultadoPedido');
+            if (vazio) vazio.style.display = total === 0 && dados.produtos.length ? 'block' : 'none';
+        }
+
         function atualizarProdutosPorCategoria() {
-            let html = '';
+            const vendas = vendasPorProduto();
+            const cats = dados.configuracoes.categorias.filter(c => dados.produtos.some(p => p.categoria === c));
+            if (filtroPedido.categoria && !cats.includes(filtroPedido.categoria)) filtroPedido.categoria = '';
+            const buscaAntes = document.getElementById('buscaProdutoPedido');
+            const estavaDigitando = buscaAntes && document.activeElement === buscaAntes;
+
+            let html = dados.produtos.length ? `
+                <div class="mb-3 space-y-2">
+                    <div class="flex gap-2 flex-wrap">
+                        <input type="search" id="buscaProdutoPedido" autocomplete="off" placeholder="🔎 Buscar produto (Enter adiciona)"
+                               value="${esc(filtroPedido.busca)}"
+                               oninput="filtroPedido.busca = this.value; aplicarFiltroProdutosPedido()"
+                               onkeydown="if(event.key==='Enter'){ event.preventDefault(); enterBuscaProdutoPedido(); }"
+                               class="flex-1 px-3 py-2 border rounded-md" style="min-width: 180px;">
+                        <select id="ordemProdutoPedido" onchange="mudarOrdemProdutosPedido(this.value)" class="px-3 py-2 border rounded-md text-sm">
+                            <option value="padrao">Ordem do cardápio</option>
+                            <option value="nome">Nome (A-Z)</option>
+                            <option value="menorPreco">Menor preço</option>
+                            <option value="maiorPreco">Maior preço</option>
+                            <option value="maisPedidos">🔥 Mais pedidos</option>
+                        </select>
+                    </div>
+                    <div id="chipsCategoriaPedido" class="flex gap-2 overflow-x-auto pb-1">
+                        ${['', ...cats].map(c => `<button type="button" data-cat="${esc(c)}" onclick="filtrarCategoriaPedido(this.dataset.cat)"
+                            class="chip-cat whitespace-nowrap px-3 py-1 rounded-full text-sm border">${c ? esc(c) : 'Todas'}</button>`).join('')}
+                    </div>
+                    <p id="semResultadoPedido" class="text-sm text-gray-500 text-center py-3" style="display: none;">Nenhum produto encontrado.</p>
+                </div>` : '';
+            let pos = 0;
             dados.configuracoes.categorias.forEach(categoria => {
                 const produtos = dados.produtos.filter(p => p.categoria === categoria);
                 if (produtos.length === 0) return;
                 html += `
-                    <div class="mb-4">
+                    <div class="mb-4" data-grupo-cat="${esc(categoria)}">
                         <h5 class="font-medium text-sm text-gray-700 mb-2">${esc(categoria)}:</h5>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                        <div class="grade-produtos-pedido grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                             ${produtos.map(produto => `
-                                <div class="flex items-center gap-2 p-3 border rounded-lg">
+                                <div class="card-produto-pedido flex items-center gap-2 p-3 border rounded-lg"
+                                     data-id="${produto.id}" data-pos="${pos++}" data-preco="${produto.preco}" data-vendas="${vendas[produto.id] || 0}"
+                                     data-nome="${esc(semAcentoBusca(produto.nome))}" data-nome-original="${esc(produto.nome)}">
                                     <div class="flex-1">
                                         <p class="font-medium text-sm">${esc(produto.nome)}</p>
                                         <p class="text-sm text-green-600 font-semibold">${formatarMoeda(produto.preco)}</p>
+                                        <p class="vendas-info hidden text-xs text-gray-400">🔥 ${formatarQuantidade(vendas[produto.id] || 0)} vendido(s)</p>
                                     </div>
                                     <input type="number" min="0.5" step="0.5" placeholder="Qtd" class="w-16 px-2 py-1 border rounded text-center"
                                            onkeypress="if(event.key==='Enter') adicionarItemPedido(${produto.id}, this)">
@@ -2001,6 +2118,13 @@
                 `;
             });
             document.getElementById('produtosPorCategoria').innerHTML = html;
+            const sel = document.getElementById('ordemProdutoPedido');
+            if (sel) sel.value = filtroPedido.ordem;
+            aplicarFiltroProdutosPedido();
+            if (estavaDigitando) {
+                const b = document.getElementById('buscaProdutoPedido');
+                if (b) { b.focus(); b.setSelectionRange(b.value.length, b.value.length); }
+            }
         }
 
         function adicionarItemPedido(produtoId, input) {
@@ -2329,6 +2453,7 @@
                 </div>
             `;
             document.body.appendChild(modal);
+            ativarBuscaSelect('novoProdutoModal', { placeholder: '🔎 Buscar produto', focar: 'novaQuantidadeModal' });
         }
 
         function atualizarQuantidadeItem(input, index) {
@@ -2366,6 +2491,7 @@
                 custoUnitario: produto.custo,
                 subtotal: produto.preco * quantidade
             });
+            limparBuscaSelect('novoProdutoModal');
             document.getElementById('novoProdutoModal').value = '';
             document.getElementById('novaQuantidadeModal').value = '';
             document.getElementById('itensAtuaisPedido').innerHTML = linhasItensModal();
@@ -2400,6 +2526,446 @@
         }
 
         // =====================================================================
+        // BUSCA, FILTROS E ORDENAÇÃO (listas e seletores de todo o sistema)
+        // =====================================================================
+        function semAcentoBusca(t) { return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+
+        // Texto que aparece na tela (ignora opções de selects e botões escondidos)
+        function textoVisivel(el) {
+            if (!el) return '';
+            let t = '';
+            const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+                acceptNode: n => n.parentElement && n.parentElement.closest('select,option,button,script,style')
+                    ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+            });
+            while (w.nextNode()) t += w.currentNode.nodeValue + ' ';
+            return t.replace(/\s+/g, ' ').trim();
+        }
+
+        function numeroDoTexto(txt) {
+            const m = String(txt).match(/(-\s*(?:R\$\s*)?)?(\d[\d.,]*)/);
+            if (!m) return null;
+            let s = m[2].replace(/[.,]$/, '');
+            if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+            else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+            const n = parseFloat(s);
+            return isNaN(n) ? null : (m[1] ? -n : n);
+        }
+
+        function celulaNaColuna(tr, col) {
+            let pos = 0;
+            for (const td of tr.children) {
+                const span = td.colSpan || 1;
+                if (col < pos + span) return td;
+                pos += span;
+            }
+            return null;
+        }
+
+        function ehLinhaAviso(tr) { return tr.children.length === 1 && (tr.children[0].colSpan || 1) > 1; }
+
+        function valorCelula(tr, col, tipo) {
+            const td = celulaNaColuna(tr, col);
+            if (!td) return null;
+            if (td.dataset.ordem !== undefined) return tipo === 'texto' ? td.dataset.ordem : parseFloat(td.dataset.ordem);
+            if ((td.colSpan || 1) > 1) return null; // ex.: "não controlado"
+            const txt = textoVisivel(td);
+            if (tipo === 'texto') return txt || null;
+            if (tipo === 'data') {
+                const m = txt.match(/(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
+                return m ? new Date(+m[3], m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0)).getTime() : null;
+            }
+            return numeroDoTexto(txt);
+        }
+
+        let estadoFiltros = {};
+        try { estadoFiltros = JSON.parse(localStorage.getItem('pizzaria_filtros') || '{}') || {}; } catch (e) { estadoFiltros = {}; }
+        function guardarEstadoFiltros() {
+            const salvar = {};
+            Object.keys(estadoFiltros).forEach(k => { const { busca, ...resto } = estadoFiltros[k]; salvar[k] = resto; });
+            try { localStorage.setItem('pizzaria_filtros', JSON.stringify(salvar)); } catch (e) { }
+        }
+
+        const OPCOES_PAGAMENTO = () => [['Dinheiro', 'Dinheiro'], ['PIX', 'PIX'], ['Cartão', 'Cartão'], ['Transferência', 'Transferência']];
+        const textoColuna = (tr, col) => semAcentoBusca(textoVisivel(celulaNaColuna(tr, col)));
+
+        // Configuração de cada lista do sistema
+        const FILTROS_LISTAS = [
+            {
+                id: 'ingredientes', tbody: '#listaIngredientes', placeholder: 'Buscar ingrediente', arrasta: true,
+                ordens: [
+                    { col: 1, tipo: 'texto', rotulo: 'Nome (A-Z)' },
+                    { col: 2, tipo: 'num', rotulo: 'Preço' },
+                    { col: 3, tipo: 'num', rotulo: 'Quantidade' },
+                    { col: 5, tipo: 'num', rotulo: 'Preço por unidade' }
+                ],
+                extras: [{
+                    rotulo: 'Todas as unidades',
+                    opcoes: () => [['kg', 'Kg'], ['g', 'Gramas'], ['L', 'Litros'], ['ml', 'ML'], ['un', 'Unidade']],
+                    teste: (tr, v) => textoColuna(tr, 4).split(' ')[0] === semAcentoBusca(v)
+                }]
+            },
+            {
+                id: 'estoque', tbody: '#listaEstoque', placeholder: 'Buscar ingrediente',
+                ordens: [
+                    { col: 0, tipo: 'texto', rotulo: 'Nome (A-Z)' },
+                    { col: 1, tipo: 'num', rotulo: 'Estoque atual' },
+                    { col: 3, tipo: 'num', rotulo: 'Consumo por dia' },
+                    { col: 4, tipo: 'num', rotulo: 'Quanto tempo dura' }
+                ],
+                extras: [{
+                    rotulo: 'Todos os status',
+                    opcoes: () => [['alerta', '⚠️ Acabando (zerado/crítico/atenção)'], ['zerado', '⛔ Zerado'], ['critico', '🔴 Crítico'], ['atencao', '🟡 Atenção'], ['ok', '🟢 OK'], ['nao', 'Não controlados']],
+                    teste: (tr, v) => {
+                        if (v === 'nao') return textoColuna(tr, 1).includes('nao controlado');
+                        const st = textoColuna(tr, 5);
+                        if (v === 'alerta') return /zerado|critico|atencao/.test(st);
+                        return st.includes(v);
+                    }
+                }]
+            },
+            {
+                id: 'capacidade', tbody: '#listaCapacidade', placeholder: 'Buscar produto',
+                ordens: [
+                    { col: 0, tipo: 'texto', rotulo: 'Nome (A-Z)' },
+                    { col: 1, tipo: 'num', rotulo: 'Dá para fazer' }
+                ]
+            },
+            {
+                id: 'movimentacoes', tbody: '#listaMovimentacoes', placeholder: 'Buscar ingrediente ou pessoa', padraoRotulo: 'Mais recentes primeiro',
+                ordens: [
+                    { col: 0, tipo: 'data', rotulo: 'Data' },
+                    { col: 1, tipo: 'texto', rotulo: 'Ingrediente' },
+                    { col: 3, tipo: 'num', rotulo: 'Quantidade' }
+                ],
+                extras: [{
+                    rotulo: 'Todos os tipos',
+                    opcoes: () => [['entrada', '📥 Entrada'], ['ajuste', '✏️ Ajuste'], ['inicio', '🆕 Início do controle']],
+                    teste: (tr, v) => textoColuna(tr, 2).includes(v)
+                }]
+            },
+            {
+                id: 'pedidos', tbody: '#listaPedidos', placeholder: 'Buscar cliente, telefone ou item', padraoRotulo: 'Mais recentes primeiro',
+                ordens: [
+                    { col: 0, tipo: 'data', rotulo: 'Data/hora' },
+                    { col: 1, tipo: 'texto', rotulo: 'Cliente (A-Z)' },
+                    { col: 5, tipo: 'num', rotulo: 'Total' }
+                ]
+            },
+            {
+                id: 'clientes', tbody: '#listaClientes', busca: false, padraoRotulo: 'Ordem padrão',
+                ordens: [
+                    { col: 0, tipo: 'texto', rotulo: 'Nome (A-Z)' },
+                    { col: 1, tipo: 'num', rotulo: 'Nº de pedidos' },
+                    { col: 2, tipo: 'num', rotulo: 'Total gasto' },
+                    { col: 3, tipo: 'data', rotulo: 'Último pedido' },
+                    { col: 4, tipo: 'num', rotulo: 'Valor em aberto' }
+                ]
+            },
+            {
+                id: 'saidas', tbody: '#listaSaidas', placeholder: 'Buscar descrição', padraoRotulo: 'Mais recentes primeiro',
+                ordens: [
+                    { col: 0, tipo: 'data', rotulo: 'Data' },
+                    { col: 1, tipo: 'texto', rotulo: 'Descrição (A-Z)' },
+                    { col: 2, tipo: 'texto', rotulo: 'Categoria' },
+                    { col: 4, tipo: 'num', rotulo: 'Valor' }
+                ],
+                extras: [
+                    {
+                        rotulo: 'Todas as categorias',
+                        opcoes: () => dados.configuracoes.categoriasSaidas.map(c => [c, c]),
+                        teste: (tr, v) => textoColuna(tr, 2) === semAcentoBusca(v)
+                    },
+                    {
+                        rotulo: 'Todas as formas',
+                        opcoes: OPCOES_PAGAMENTO,
+                        teste: (tr, v) => textoColuna(tr, 3) === semAcentoBusca(v)
+                    }
+                ]
+            },
+            {
+                id: 'produtos', tbody: '#listaProdutosPorCategoria tbody', ancora: '#listaProdutosPorCategoria',
+                observar: '#listaProdutosPorCategoria', grupo: '[data-categoria]', placeholder: 'Buscar produto',
+                ordens: [
+                    { col: 0, tipo: 'texto', rotulo: 'Nome (A-Z)' },
+                    { col: 1, tipo: 'num', rotulo: 'Custo' },
+                    { col: 2, tipo: 'num', rotulo: 'Preço' },
+                    { col: 3, tipo: 'num', rotulo: 'Margem' },
+                    { col: 4, tipo: 'num', rotulo: 'Lucro por unidade' }
+                ],
+                extras: [
+                    {
+                        rotulo: 'Todas as categorias',
+                        opcoes: () => dados.configuracoes.categorias.map(c => [c, c]),
+                        teste: (tr, v) => { const g = tr.closest('[data-categoria]'); return !!g && g.dataset.categoria === v; }
+                    },
+                    {
+                        rotulo: 'Qualquer margem',
+                        opcoes: () => [['50', 'Margem abaixo de 50%'], ['30', 'Margem abaixo de 30%']],
+                        teste: (tr, v) => { const m = valorCelula(tr, 3, 'num'); return m !== null && m < +v; }
+                    }
+                ]
+            }
+        ];
+
+        function estadoDoFiltro(cfg) {
+            const st = estadoFiltros[cfg.id] || (estadoFiltros[cfg.id] = {});
+            if (typeof st.busca !== 'string') st.busca = '';
+            if (!Array.isArray(st.extras)) st.extras = [];
+            if (st.ordem === undefined || (st.ordem !== null && !cfg.ordens[st.ordem])) st.ordem = null;
+            if (!st.dir) st.dir = 'asc';
+            return st;
+        }
+
+        function direcaoPadrao(o) { return o.tipo === 'texto' ? 'asc' : 'desc'; }
+
+        function mudarOrdemFiltro(cfg, indice) {
+            const st = estadoDoFiltro(cfg);
+            if (indice === st.ordem && indice !== null) st.dir = st.dir === 'asc' ? 'desc' : 'asc';
+            else { st.ordem = indice; st.dir = indice === null ? 'asc' : direcaoPadrao(cfg.ordens[indice]); }
+            guardarEstadoFiltros();
+            aplicarFiltroLista(cfg);
+        }
+
+        function montarBarraFiltro(cfg) {
+            if (document.getElementById('barra-' + cfg.id)) return;
+            const primeiro = document.querySelector(cfg.tbody);
+            const ancora = cfg.ancora ? document.querySelector(cfg.ancora) : (primeiro && (primeiro.closest('.overflow-x-auto') || primeiro.closest('table')));
+            if (!ancora) return;
+            const barra = document.createElement('div');
+            barra.id = 'barra-' + cfg.id;
+            barra.className = 'barra-filtro grid grid-cols-2 md:flex md:flex-wrap md:items-center gap-2 mb-3 p-2 bg-gray-50 rounded-lg';
+            barra.innerHTML = `
+                ${cfg.busca === false ? '' : `<input type="search" data-f="busca" autocomplete="off" placeholder="🔎 ${esc(cfg.placeholder || 'Buscar')}"
+                    class="col-span-2 md:flex-1 px-3 py-2 border rounded-md text-sm" style="min-width: 180px;">`}
+                ${(cfg.extras || []).map((x, i) => `<select data-f="extra" data-i="${i}" class="min-w-0 px-3 py-2 border rounded-md text-sm"></select>`).join('')}
+                <select data-f="ordem" class="min-w-0 px-3 py-2 border rounded-md text-sm">
+                    <option value="">${cfg.arrasta ? 'Ordem manual (arrastar)' : esc(cfg.padraoRotulo || 'Ordem padrão')}</option>
+                    ${cfg.ordens.map((o, i) => `<option value="${i}">Ordenar: ${esc(o.rotulo)}</option>`).join('')}
+                </select>
+                <button type="button" data-f="dir" class="px-3 py-2 border rounded-md text-sm bg-white hover:bg-gray-100" title="Inverter ordem"></button>
+                <span data-f="resumo" class="col-span-2 text-xs text-gray-500 md:w-full" style="display: none;"></span>`;
+            ancora.parentNode.insertBefore(barra, ancora);
+
+            const st = estadoDoFiltro(cfg);
+            const busca = barra.querySelector('[data-f="busca"]');
+            if (busca) busca.addEventListener('input', () => { st.busca = busca.value; aplicarFiltroLista(cfg); });
+            barra.querySelectorAll('[data-f="extra"]').forEach(sel => sel.addEventListener('change', () => {
+                st.extras[+sel.dataset.i] = sel.value;
+                guardarEstadoFiltros();
+                aplicarFiltroLista(cfg);
+            }));
+            barra.querySelector('[data-f="ordem"]').addEventListener('change', e => {
+                mudarOrdemFiltro(cfg, e.target.value === '' ? null : +e.target.value);
+            });
+            barra.querySelector('[data-f="dir"]').addEventListener('click', () => {
+                if (st.ordem === null) { toast('Escolha como ordenar primeiro.', 'info'); return; }
+                mudarOrdemFiltro(cfg, st.ordem);
+            });
+        }
+
+        function aplicarFiltroLista(cfg) {
+            const barra = document.getElementById('barra-' + cfg.id);
+            if (!barra) return;
+            const st = estadoDoFiltro(cfg);
+
+            // Atualiza opções dos filtros (ex.: categorias novas)
+            (cfg.extras || []).forEach((x, i) => {
+                const sel = barra.querySelector(`[data-f="extra"][data-i="${i}"]`);
+                const ops = x.opcoes();
+                const html = `<option value="">${esc(x.rotulo)}</option>` + ops.map(([v, r]) => `<option value="${esc(v)}">${esc(r)}</option>`).join('');
+                if (sel._html !== html) { sel.innerHTML = html; sel._html = html; }
+                if (st.extras[i] && !ops.some(o => o[0] === st.extras[i])) st.extras[i] = '';
+                sel.value = st.extras[i] || '';
+            });
+            barra.querySelector('[data-f="ordem"]').value = st.ordem === null ? '' : String(st.ordem);
+            const btnDir = barra.querySelector('[data-f="dir"]');
+            if (st.ordem === null) { btnDir.textContent = '↕️'; btnDir.classList.add('text-gray-400'); }
+            else {
+                const texto = cfg.ordens[st.ordem].tipo === 'texto';
+                const data = cfg.ordens[st.ordem].tipo === 'data';
+                btnDir.classList.remove('text-gray-400');
+                btnDir.textContent = st.dir === 'asc'
+                    ? (texto ? '⬆️ A → Z' : data ? '⬆️ Mais antigos' : '⬆️ Menor → maior')
+                    : (texto ? '⬇️ Z → A' : data ? '⬇️ Mais recentes' : '⬇️ Maior → menor');
+            }
+            const campoBusca = barra.querySelector('[data-f="busca"]');
+            if (campoBusca && campoBusca.value !== st.busca) campoBusca.value = st.busca;
+
+            const termo = semAcentoBusca(st.busca.trim());
+            const termoNum = /^[\d\s()+-]+$/.test(termo) ? termo.replace(/\D/g, '') : '';
+            const filtrando = !!termo || st.extras.some(Boolean);
+            const ativo = filtrando || st.ordem !== null;
+            const ordem = st.ordem !== null ? cfg.ordens[st.ordem] : null;
+            const fator = st.dir === 'asc' ? 1 : -1;
+            let total = 0, visiveis = 0;
+
+            document.querySelectorAll(cfg.tbody).forEach(tb => {
+                tb.querySelectorAll('.linha-sem-resultado').forEach(l => l.remove());
+                const linhas = [...tb.children].filter(tr => !ehLinhaAviso(tr));
+                if (linhas.some(tr => tr._pos === undefined)) linhas.forEach((tr, i) => { tr._pos = i; });
+                let vis = 0;
+                linhas.forEach(tr => {
+                    let ok = true;
+                    if (termo) {
+                        const txt = semAcentoBusca(textoVisivel(tr));
+                        ok = txt.includes(termo) ||
+                            (termoNum.length >= 3 && [...tr.children].some(td => textoVisivel(td).replace(/\D/g, '').includes(termoNum)));
+                    }
+                    (cfg.extras || []).forEach((x, i) => { if (ok && st.extras[i]) ok = x.teste(tr, st.extras[i]); });
+                    tr.classList.toggle('filtro-oculto', !ok);
+                    if (ok) vis++;
+                });
+                total += linhas.length;
+                visiveis += vis;
+
+                let ordenadas = [...linhas];
+                if (ordem) {
+                    const valores = new Map(linhas.map(tr => [tr, valorCelula(tr, ordem.col, ordem.tipo)]));
+                    ordenadas.sort((a, b) => {
+                        const va = valores.get(a), vb = valores.get(b);
+                        if (va === null && vb === null) return a._pos - b._pos;
+                        if (va === null) return 1;   // sem valor vai sempre para o fim
+                        if (vb === null) return -1;
+                        const c = typeof va === 'string'
+                            ? va.localeCompare(vb, 'pt-BR', { sensitivity: 'base', numeric: true })
+                            : va - vb;
+                        return c * fator || a._pos - b._pos;
+                    });
+                } else {
+                    ordenadas.sort((a, b) => a._pos - b._pos);
+                }
+                if (ordenadas.some((tr, i) => linhas[i] !== tr)) ordenadas.forEach(tr => tb.appendChild(tr));
+
+                if (cfg.grupo) {
+                    const g = tb.closest(cfg.grupo);
+                    if (g) g.classList.toggle('filtro-oculto', linhas.length > 0 && vis === 0);
+                } else if (linhas.length > 0 && vis === 0) {
+                    const cols = tb.closest('table').querySelectorAll('thead th').length || 1;
+                    tb.insertAdjacentHTML('beforeend', `<tr class="linha-sem-resultado"><td colspan="${cols}" class="py-4 text-center text-gray-500">Nada encontrado com essa busca/filtro.</td></tr>`);
+                }
+
+                if (cfg.arrasta) {
+                    tb.dataset.semArrastar = ativo ? '1' : '';
+                    const tabela = tb.closest('table');
+                    if (tabela) tabela.classList.toggle('sem-arrastar', ativo);
+                }
+
+                // Cabeçalhos clicáveis (computador)
+                const thead = tb.closest('table') && tb.closest('table').tHead;
+                if (thead && thead.rows[0]) {
+                    cfg.ordens.forEach((o, i) => {
+                        const th = thead.rows[0].cells[o.col];
+                        if (!th) return;
+                        if (!th.dataset.titulo) {
+                            th.dataset.titulo = th.textContent.trim();
+                            th.classList.add('th-ordenavel');
+                            th.title = 'Clique para ordenar';
+                            th.insertAdjacentHTML('beforeend', '<span class="seta-ordem"></span>');
+                            th.addEventListener('click', () => mudarOrdemFiltro(cfg, i));
+                        }
+                        const seta = th.querySelector('.seta-ordem');
+                        if (seta) seta.textContent = st.ordem === i ? (st.dir === 'asc' ? '▲' : '▼') : '';
+                    });
+                }
+            });
+
+            const resumo = barra.querySelector('[data-f="resumo"]');
+            let texto = '';
+            if (filtrando && total) texto = visiveis ? `Mostrando ${visiveis} de ${total}.` : 'Nada encontrado com essa busca/filtro.';
+            if (cfg.arrasta && ativo && total) texto += (texto ? ' ' : '') + 'Para arrastar, use "Ordem manual" e limpe a busca.';
+            resumo.textContent = texto;
+            resumo.style.display = texto ? '' : 'none';
+            barra.style.display = total || filtrando ? '' : 'none';
+        }
+
+        function inicializarFiltrosListas() {
+            FILTROS_LISTAS.forEach(cfg => {
+                montarBarraFiltro(cfg);
+                const alvo = document.querySelector(cfg.observar || cfg.tbody);
+                if (!alvo) return;
+                const obs = new MutationObserver(() => {
+                    aplicarFiltroLista(cfg);
+                    obs.takeRecords(); // ignora as mudanças feitas pela própria ordenação
+                });
+                obs.observe(alvo, { childList: true, subtree: !!cfg.observar });
+                aplicarFiltroLista(cfg);
+                obs.takeRecords();
+            });
+        }
+
+        // --- Campo de busca dentro de seletores (ingrediente da receita, calculadora, editar pedido) ---
+        function ativarBuscaSelect(id, opcoes = {}) {
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            sel._original = sel.innerHTML;
+            if (!sel._campoBusca) {
+                const wrap = document.createElement('div');
+                wrap.className = 'flex flex-col gap-1 min-w-0' + (sel.classList.contains('flex-1') ? ' flex-1' : '');
+                sel.parentNode.insertBefore(wrap, sel);
+                const inp = document.createElement('input');
+                inp.type = 'search';
+                inp.autocomplete = 'off';
+                inp.placeholder = opcoes.placeholder || '🔎 Digite para buscar';
+                inp.className = 'w-full px-3 py-2 border rounded-md text-sm';
+                wrap.appendChild(inp);
+                wrap.appendChild(sel);
+                sel.classList.add('w-full');
+                inp.addEventListener('input', () => filtrarOpcoesSelect(sel));
+                inp.addEventListener('keydown', e => {
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    if (sel.value && opcoes.focar) { const f = document.getElementById(opcoes.focar); if (f) f.focus(); }
+                    else if (!sel.value) toast('Mais de um resultado — escolha na lista ou digite mais.', 'info');
+                });
+                sel._campoBusca = inp;
+            }
+            filtrarOpcoesSelect(sel);
+        }
+
+        function filtrarOpcoesSelect(sel) {
+            const termo = semAcentoBusca(sel._campoBusca.value.trim());
+            const valorAtual = sel.value;
+            const tmp = document.createElement('select');
+            tmp.innerHTML = sel._original;
+            if (termo) {
+                [...tmp.querySelectorAll('optgroup')].forEach(g => {
+                    if (semAcentoBusca(g.label).includes(termo)) g.dataset.manter = '1'; // buscou pela categoria
+                });
+                [...tmp.querySelectorAll('option')].forEach(o => {
+                    if (o.value === '') return;
+                    const grupo = o.parentElement.tagName === 'OPTGROUP' ? o.parentElement : null;
+                    if (grupo && grupo.dataset.manter) return;
+                    if (!semAcentoBusca(o.textContent).includes(termo)) o.remove();
+                });
+                [...tmp.querySelectorAll('optgroup')].forEach(g => { if (!g.children.length) g.remove(); });
+            }
+            sel.innerHTML = tmp.innerHTML;
+            const reais = [...sel.options].filter(o => o.value !== '');
+            const vazio = sel.querySelector('option[value=""]');
+            if (vazio && termo) vazio.textContent = reais.length ? `${reais.length} encontrado(s) — escolha` : 'Nada encontrado';
+            if (reais.some(o => o.value === valorAtual)) sel.value = valorAtual;
+            else if (termo && reais.length === 1) sel.value = reais[0].value;
+            else sel.value = '';
+            if (sel.value !== valorAtual) sel.dispatchEvent(new Event('change'));
+        }
+
+        function limparBuscaSelect(id) {
+            const sel = document.getElementById(id);
+            if (!sel || !sel._campoBusca) return;
+            sel._campoBusca.value = '';
+            filtrarOpcoesSelect(sel);
+        }
+
+        // --- Busca simples em listas de janelas (modais) ---
+        function filtrarItensBusca(input, alvo, item) {
+            const termo = semAcentoBusca(input.value.trim());
+            document.querySelectorAll(`${alvo} ${item}`).forEach(el => {
+                el.classList.toggle('busca-oculto', !!termo && !semAcentoBusca(textoVisivel(el)).includes(termo));
+            });
+        }
+
+        // =====================================================================
         // ARRASTAR E SOLTAR (sem biblioteca externa)
         // =====================================================================
         function Sortable(el, options) {
@@ -2408,6 +2974,12 @@
             let dragEl = null, dragStartIndex = 0;
 
             el.addEventListener('dragstart', e => {
+                // Com busca/ordenação ativa a posição na tela não é a posição real da lista
+                if (el.dataset.semArrastar === '1') {
+                    e.preventDefault();
+                    toast('Para arrastar, volte para "Ordem manual" e limpe a busca/filtros.', 'info');
+                    return;
+                }
                 dragEl = e.target.closest('tr');
                 if (!dragEl) return;
                 dragStartIndex = Array.from(el.children).indexOf(dragEl);
@@ -2427,6 +2999,8 @@
                 dragEl.style.opacity = '';
                 const newIndex = Array.from(el.children).indexOf(dragEl);
                 dragEl = null;
+                // Nova ordem manual passa a ser a ordem "original" da busca/ordenação
+                Array.from(el.children).forEach((tr, i) => { tr._pos = i; });
                 if (options.onEnd) options.onEnd({ oldIndex: dragStartIndex, newIndex });
             });
         }
@@ -2608,9 +3182,11 @@
             container.innerHTML = `
                 <div class="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4 confirm-pop">
                     <h3 class="text-lg font-semibold mb-4">🔄 Atualização Rápida de Preços</h3>
-                    <div class="space-y-3 max-h-60 overflow-y-auto">
+                    <input type="search" placeholder="🔎 Buscar ingrediente" autocomplete="off"
+                           oninput="filtrarItensBusca(this, '#listaQP', '.qp-row')" class="w-full px-3 py-2 border rounded-md text-sm mb-3">
+                    <div id="listaQP" class="space-y-3 max-h-60 overflow-y-auto">
                         ${dados.ingredientes.map(ing => `
-                            <div class="flex items-center gap-2">
+                            <div class="qp-row flex items-center gap-2">
                                 <span class="flex-1 text-sm">${esc(ing.nome)}</span>
                                 <input type="number" step="0.01" value="${ing.preco}" class="qp-input w-20 px-2 py-1 border rounded text-right text-sm" data-id="${ing.id}">
                                 <span class="text-xs text-gray-500">/${ing.quantidade}${ing.unidade}</span>
@@ -2783,7 +3359,7 @@
         }
 
         function thOrdenavel(campo, rotulo, alinhamento) {
-            return `<th class="text-${alinhamento} py-3 px-2 cursor-pointer select-none hover:bg-gray-100" onclick="mudarOrdemReceitas('${campo}')" title="Ordenar por ${rotulo}">${rotulo} <span class="text-xs">${setaOrdem(campo)}</span></th>`;
+            return `<th data-titulo="${rotulo}" class="text-${alinhamento} py-3 px-2 cursor-pointer select-none hover:bg-gray-100" onclick="mudarOrdemReceitas('${campo}')" title="Ordenar por ${rotulo}">${rotulo} <span class="text-xs">${setaOrdem(campo)}</span></th>`;
         }
 
         function atualizarListaReceitas() {
@@ -2901,6 +3477,7 @@
                 const ing = dados.ingredientes.find(i => i.id == this.value);
                 document.getElementById('unidadeAtual').textContent = ing ? ing.unidade : '-';
             };
+            ativarBuscaSelect('ingredienteReceita', { placeholder: '🔎 Buscar ingrediente', focar: 'quantidadeIngredienteReceita' });
         }
 
         function adicionarIngredienteReceita() {
@@ -2922,8 +3499,11 @@
                 custoTotal: ing.precoUnidade * quantidade
             });
 
+            limparBuscaSelect('ingredienteReceita');
             limparSelecaoIngredienteReceita();
             atualizarIngredientesReceita();
+            const busca = document.getElementById('ingredienteReceita')._campoBusca;
+            if (busca && !ehCelular()) busca.focus();
         }
 
         function atualizarIngredientesReceita() {
@@ -3237,7 +3817,7 @@
                 const produtos = dados.produtos.filter(p => p.categoria === categoria);
                 if (produtos.length === 0) return;
                 html += `
-                    <div class="bg-white p-6 rounded-lg shadow mb-6">
+                    <div class="bg-white p-6 rounded-lg shadow mb-6" data-categoria="${esc(categoria)}">
                         <h3 class="text-lg font-semibold mb-4">${esc(categoria)}</h3>
                         <div class="overflow-x-auto">
                             <table class="w-full text-sm">
@@ -3364,8 +3944,9 @@
                 <div class="bg-white p-6 rounded-lg shadow-lg max-w-2xl w-full mx-4 confirm-pop">
                     <h3 class="text-lg font-semibold mb-1">💲 Atualização Rápida de Preços de Venda</h3>
                     <p class="text-sm text-gray-500 mb-4">Filtre por categoria, marque os produtos que quer alterar, ajuste o preço e salve.</p>
-                    <div class="mb-3">
-                        <label class="block text-sm font-medium mb-1">Categoria:</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
+                        <input type="search" id="buscaPV" placeholder="🔎 Buscar produto" autocomplete="off" oninput="filtrarProdutosPV()"
+                               class="w-full px-3 py-2 border rounded-md">
                         <select id="filtroCategoriaPV" onchange="filtrarProdutosPV()" class="w-full px-3 py-2 border rounded-md">
                             <option value="">Todas as categorias</option>
                             ${dados.configuracoes.categorias.map(cat => `<option value="${esc(cat)}">${esc(cat)}</option>`).join('')}
@@ -3391,7 +3972,7 @@
                             </div>
                         `).join('')}
                     </div>
-                    <p id="pvVazio" class="text-sm text-gray-500 text-center py-4" style="display:none;">Nenhum produto nessa categoria.</p>
+                    <p id="pvVazio" class="text-sm text-gray-500 text-center py-4" style="display:none;">Nenhum produto encontrado.</p>
                     <div class="flex gap-2 mt-4">
                         <button onclick="salvarAtualizacaoPrecosVenda()" class="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">💾 Salvar Marcados</button>
                         <button onclick="fecharModal('modalPrecosVenda')" class="flex-1 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">✖ Cancelar</button>
@@ -3403,9 +3984,11 @@
 
         function filtrarProdutosPV() {
             const categoria = document.getElementById('filtroCategoriaPV').value;
+            const termo = semAcentoBusca(document.getElementById('buscaPV').value.trim());
             let visiveis = 0;
             document.querySelectorAll('.pv-row').forEach(linha => {
-                const mostrar = !categoria || linha.dataset.categoria === categoria;
+                const mostrar = (!categoria || linha.dataset.categoria === categoria) &&
+                    (!termo || semAcentoBusca(linha.querySelector('p').textContent).includes(termo));
                 linha.style.display = mostrar ? 'flex' : 'none';
                 if (mostrar) visiveis++;
             });
@@ -3480,6 +4063,7 @@
                 }
             });
             document.getElementById('produtoCalculadora').innerHTML = html;
+            ativarBuscaSelect('produtoCalculadora', { placeholder: '🔎 Buscar produto', focar: 'quantidadeCalculadora' });
         }
 
         function adicionarItemCalculadora() {
@@ -3498,6 +4082,7 @@
                 lucro: (produto.preco - produto.custo) * quantidade
             });
 
+            limparBuscaSelect('produtoCalculadora');
             document.getElementById('produtoCalculadora').value = '';
             document.getElementById('quantidadeCalculadora').value = '';
             atualizarSimulacao();
@@ -3753,6 +4338,9 @@
                 });
                 document.getElementById('novaCategoria').addEventListener('keypress', e => { if (e.key === 'Enter') adicionarCategoria(); });
                 document.getElementById('novaCategoriaSaida').addEventListener('keypress', e => { if (e.key === 'Enter') adicionarCategoriaSaida(); });
+
+                // Busca, filtros e ordenação em todas as listas
+                inicializarFiltrosListas();
 
                 // Celular: sempre que as listas forem redesenhadas, viram cartões
                 new MutationObserver(agendarPrepararMobile).observe(document.querySelector('.container'), { childList: true, subtree: true });
