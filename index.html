@@ -2,7 +2,10 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#ea580c">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Chef Pereira - Controle</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-app-compat.min.js"></script>
@@ -24,6 +27,71 @@
         .sync-pulse { animation: pulseBadge 1.4s ease-in-out infinite; }
         @keyframes pulseBadge { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
         #loginGate { transition: opacity .3s ease; }
+
+        /* ---------- Toque mais rápido e fluido ---------- */
+        html { -webkit-tap-highlight-color: transparent; scroll-behavior: smooth; }
+        button, a, select, input[type="checkbox"] { touch-action: manipulation; }
+        .confirm-pop { max-height: 90vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .nav-abas { scrollbar-width: none; -ms-overflow-style: none; }
+        .nav-abas::-webkit-scrollbar { display: none; }
+        .barra-pedido { display: none; }
+
+        /* ---------- Celular ---------- */
+        @media (max-width: 767px) {
+            /* Evita o zoom automático do iPhone ao tocar nos campos */
+            input, select, textarea { font-size: 16px !important; }
+            input, select { min-height: 44px; }
+            input[type="checkbox"] { min-height: 0; width: 22px; height: 22px; }
+
+            /* Menos espaço desperdiçado */
+            .container { padding-left: .5rem !important; padding-right: .5rem !important; }
+            .p-6 { padding: 1rem !important; }
+            .mb-6 { margin-bottom: 1rem !important; }
+            .mt-6 { margin-top: 1rem !important; }
+            h1 { font-size: 1.25rem !important; line-height: 1.75rem !important; }
+
+            /* Menu de abas: uma linha que desliza com o dedo */
+            .nav-abas { flex-wrap: nowrap !important; overflow-x: auto; }
+            .nav-abas .tab-btn { flex-shrink: 0; white-space: nowrap; padding: .65rem .9rem; }
+
+            /* Botões maiores para o dedo */
+            #produtosPorCategoria input { width: 4.25rem; }
+            #produtosPorCategoria button, table.cards td button { min-width: 44px; min-height: 44px; }
+
+            /* Tabelas viram cartões */
+            table.cards thead { display: none; }
+            table.cards, table.cards tbody { display: block; width: 100%; }
+            table.cards tr { display: flex; flex-direction: column; border: 1px solid #e5e7eb; border-radius: .75rem; margin-bottom: .65rem; padding: .5rem .75rem; background: #fff; }
+            table.cards tr:hover { background: #fff; }
+            table.cards td { display: flex; justify-content: space-between; align-items: center; gap: .75rem; padding: .35rem 0 !important; text-align: right !important; border: 0; }
+            table.cards td::before { content: attr(data-label); font-weight: 600; color: #6b7280; font-size: .75rem; text-align: left; flex-shrink: 0; }
+            table.cards td.td-principal { order: -1; display: block; text-align: left !important; font-size: 1rem; padding-bottom: .5rem !important; border-bottom: 1px solid #f3f4f6; margin-bottom: .25rem; }
+            table.cards td.td-principal::before { display: none; }
+            table.cards td[colspan] { display: block; text-align: center !important; }
+            table.cards td[colspan]::before { display: none; }
+            table.cards td.td-arrastar { display: none; }
+            table.cards td input, table.cards td select { min-width: 0; }
+            table.cards td > div.flex { justify-content: flex-end; flex-wrap: wrap; }
+
+            /* Janelas abrem de baixo para cima */
+            .fixed.inset-0.flex:not(#loginGate) { align-items: flex-end !important; }
+            .confirm-pop {
+                margin: 0 !important; width: 100% !important; max-width: none !important;
+                border-radius: 1.25rem 1.25rem 0 0 !important;
+                padding-bottom: calc(1.5rem + env(safe-area-inset-bottom)) !important;
+                animation: subir .22s ease !important;
+            }
+            @keyframes subir { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+            /* Barra fixa do pedido em andamento */
+            .barra-pedido.visivel { display: flex; }
+            body.com-barra { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+
+            /* Avisos ocupam a largura toda, acima da barra */
+            #toastContainer { left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); align-items: stretch !important; }
+            body.com-barra #toastContainer { bottom: calc(96px + env(safe-area-inset-bottom)); }
+            .toast-item { max-width: none !important; }
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -42,6 +110,16 @@
     <!-- Notificações -->
     <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col items-end"></div>
 
+    <!-- Barra fixa do pedido em andamento (só no celular) -->
+    <div id="barraPedido" class="barra-pedido fixed bottom-0 inset-x-0 z-40 bg-white border-t shadow-lg px-4 pt-3 items-center justify-between gap-3"
+         style="padding-bottom: calc(.75rem + env(safe-area-inset-bottom));">
+        <div>
+            <p class="text-xs text-gray-500"><span id="barraQtd">0</span> no pedido</p>
+            <p id="barraTotal" class="text-lg font-bold text-green-600">R$ 0,00</p>
+        </div>
+        <button onclick="irParaFinalizar()" class="bg-orange-600 text-white px-5 py-3 rounded-lg font-semibold">Revisar e finalizar ↓</button>
+    </div>
+
     <div class="container mx-auto p-4 max-w-7xl">
         <!-- Header -->
         <header class="bg-white rounded-lg shadow p-6 mb-6 no-print">
@@ -53,7 +131,7 @@
                     <button onclick="sairDaConta()" class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200">Sair</button>
                 </div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                 <div>
                     <label class="text-sm text-gray-600">Data Início:</label>
                     <input type="date" id="dataInicio" class="w-full px-3 py-2 border rounded-md">
@@ -62,7 +140,7 @@
                     <label class="text-sm text-gray-600">Data Fim:</label>
                     <input type="date" id="dataFim" class="w-full px-3 py-2 border rounded-md">
                 </div>
-                <div>
+                <div class="col-span-2 md:col-span-1">
                     <label class="text-sm text-gray-600">Meta Mensal:</label>
                     <input type="number" id="metaMensal" placeholder="5000" class="w-full px-3 py-2 border rounded-md">
                 </div>
@@ -70,8 +148,8 @@
         </header>
 
         <!-- Navegação -->
-        <nav class="bg-white rounded-lg shadow p-4 mb-6 no-print">
-            <div class="flex flex-wrap gap-2">
+        <nav class="bg-white rounded-lg shadow p-2 md:p-4 mb-6 no-print sticky top-0 z-30">
+            <div class="nav-abas flex flex-wrap gap-2">
                 <button onclick="showTab('dashboard')" class="tab-btn bg-orange-600 text-white px-4 py-2 rounded-md">📊 Dashboard</button>
                 <button onclick="showTab('pedidos')" class="tab-btn px-4 py-2 rounded-md hover:bg-gray-100">📋 Pedidos</button>
                 <button onclick="showTab('clientes')" class="tab-btn px-4 py-2 rounded-md hover:bg-gray-100">👥 Clientes</button>
@@ -86,7 +164,7 @@
 
         <!-- ===================== DASHBOARD ===================== -->
         <div id="dashboard" class="tab-content active">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-6">
                 <div class="bg-white p-6 rounded-lg shadow">
                     <div class="flex items-center justify-between">
                         <div>
@@ -168,10 +246,10 @@
         <div id="pedidos" class="tab-content">
             <div class="bg-white p-6 rounded-lg shadow mb-6">
                 <h3 class="text-lg font-semibold mb-4">Novo Pedido</h3>
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4">
                     <input type="text" id="nomeCliente" placeholder="Nome do cliente *" list="datalistClientes" autocomplete="off"
-                           oninput="selecionarClientePorNome()" class="px-3 py-2 border rounded-md">
-                    <input type="tel" id="telefoneCliente" placeholder="Telefone" oninput="verificarClienteNoPedido()" class="px-3 py-2 border rounded-md">
+                           oninput="selecionarClientePorNome()" class="col-span-2 md:col-span-1 px-3 py-2 border rounded-md">
+                    <input type="tel" id="telefoneCliente" placeholder="Telefone" inputmode="tel" oninput="verificarClienteNoPedido()" class="col-span-2 md:col-span-1 px-3 py-2 border rounded-md">
                     <input type="date" id="dataPedido" class="px-3 py-2 border rounded-md">
                     <input type="time" id="horaPedido" class="px-3 py-2 border rounded-md">
                 </div>
@@ -209,7 +287,7 @@
                     Salvar / atualizar este cliente no cadastro
                 </label>
 
-                <button onclick="finalizarPedido()" class="bg-orange-600 text-white px-6 py-3 rounded-md hover:bg-orange-700">
+                <button onclick="finalizarPedido()" class="w-full md:w-auto bg-orange-600 text-white px-6 py-3 rounded-md hover:bg-orange-700 font-semibold">
                     💾 Finalizar Pedido
                 </button>
             </div>
@@ -290,7 +368,7 @@
 
         <!-- ===================== ESTOQUE ===================== -->
         <div id="estoque" class="tab-content">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div class="grid grid-cols-3 gap-3 md:gap-6 mb-6">
                 <div class="bg-white p-6 rounded-lg shadow">
                     <p class="text-sm text-gray-600">Ingredientes controlados</p>
                     <p id="estoqueQtdControlados" class="text-2xl font-bold text-blue-600">0</p>
@@ -819,7 +897,10 @@
             const el = document.createElement('div');
             el.className = `toast-item ${cores[tipo] || cores.info} text-white px-4 py-3 rounded-lg shadow-lg mb-2 text-sm max-w-xs`;
             el.textContent = mensagem;
-            document.getElementById('toastContainer').appendChild(el);
+            const caixa = document.getElementById('toastContainer');
+            // Mantém no máximo 2 avisos na tela para não cobrir o conteúdo
+            while (caixa.children.length >= 2) caixa.firstElementChild.remove();
+            caixa.appendChild(el);
             requestAnimationFrame(() => el.classList.add('toast-show'));
             setTimeout(() => {
                 el.classList.remove('toast-show');
@@ -1057,8 +1138,79 @@
             if (btn) {
                 btn.classList.add('bg-orange-600', 'text-white');
                 btn.classList.remove('hover:bg-gray-100');
+                // No celular, centraliza a aba escolhida no menu deslizante
+                if (ehCelular()) {
+                    const nav = btn.parentElement;
+                    nav.scrollTo({ left: btn.offsetLeft - (nav.clientWidth - btn.offsetWidth) / 2, behavior: 'smooth' });
+                }
             }
             atualizarAba(tab);
+            atualizarBarraPedido();
+            // Se a pessoa estava lá embaixo, volta para o começo da aba
+            if (el) {
+                const nav = document.querySelector('nav');
+                const topo = el.getBoundingClientRect().top + window.scrollY - (nav ? nav.offsetHeight + 8 : 0);
+                if (window.scrollY > topo) window.scrollTo({ top: topo, behavior: 'smooth' });
+            }
+        }
+
+        // =====================================================================
+        // CELULAR — tabelas em cartões, barra do pedido
+        // =====================================================================
+        function ehCelular() { return window.matchMedia('(max-width: 767px)').matches; }
+
+        const COLUNAS_PRINCIPAIS = ['Produto', 'Cliente', 'Ingrediente', 'Descrição'];
+
+        // Coloca o nome da coluna em cada célula; o CSS usa isso para montar os cartões no celular
+        function prepararTabelasMobile() {
+            document.querySelectorAll('.container table').forEach(tabela => {
+                const titulos = [...tabela.querySelectorAll('thead th')].map(th => th.textContent.trim());
+                if (!titulos.length) return;
+                tabela.classList.add('cards');
+                const idxPrincipal = titulos.findIndex(t => COLUNAS_PRINCIPAIS.includes(t));
+                tabela.querySelectorAll('tbody tr').forEach(tr => {
+                    [...tr.children].forEach((td, i) => {
+                        if (td.dataset.rotulado) return;
+                        td.dataset.rotulado = '1';
+                        if (td.hasAttribute('colspan')) return;
+                        if (td.querySelector('[class*="drag-handle"]')) { td.classList.add('td-arrastar'); return; }
+                        if (i === idxPrincipal) { td.classList.add('td-principal'); return; }
+                        td.dataset.label = titulos[i] || '';
+                    });
+                });
+            });
+            // Teclado numérico com vírgula/ponto nos campos de número
+            document.querySelectorAll('input[type="number"]:not([inputmode])').forEach(inp => {
+                inp.setAttribute('inputmode', inp.step && inp.step !== '1' ? 'decimal' : 'numeric');
+            });
+        }
+
+        let agendadoMobile = false;
+        function agendarPrepararMobile() {
+            if (agendadoMobile) return;
+            agendadoMobile = true;
+            requestAnimationFrame(() => { agendadoMobile = false; prepararTabelasMobile(); });
+        }
+
+        function atualizarBarraPedido() {
+            const barra = document.getElementById('barraPedido');
+            if (!barra) return;
+            const itens = dados.pedidoAtual.itens;
+            const mostrar = itens.length > 0 && abaAtiva() === 'pedidos';
+            barra.classList.toggle('visivel', mostrar);
+            document.body.classList.toggle('com-barra', mostrar && ehCelular());
+            if (mostrar) {
+                const qtd = itens.reduce((t, i) => t + i.quantidade, 0);
+                document.getElementById('barraQtd').textContent = `${formatarQuantidade(qtd)} ${qtd === 1 ? 'item' : 'itens'}`;
+                document.getElementById('barraTotal').textContent = formatarMoeda(dados.pedidoAtual.total);
+            }
+        }
+
+        function irParaFinalizar() {
+            const alvo = document.getElementById('itensPedido');
+            const nav = document.querySelector('nav');
+            const topo = alvo.getBoundingClientRect().top + window.scrollY - (nav ? nav.offsetHeight + 8 : 0);
+            window.scrollTo({ top: topo, behavior: 'smooth' });
         }
 
         function filtrarPorPeriodo(lista) {
@@ -1836,16 +1988,21 @@
             dados.pedidoAtual.total = dados.pedidoAtual.itens.reduce((t, i) => t + i.subtotal, 0);
             atualizarItensPedido();
             input.value = '';
+            // Pequeno "pulo" na barra de baixo para confirmar o toque
+            const barra = document.getElementById('barraPedido');
+            if (barra && barra.animate) barra.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-6px)' }, { transform: 'translateY(0)' }], { duration: 220 });
+            if (navigator.vibrate && ehCelular()) navigator.vibrate(15);
         }
 
         function adicionarMeiaUnidade(produtoId) {
             adicionarItemPedido(produtoId, { value: '0.5' });
-            toast('½ unidade adicionada ao pedido.', 'info');
+            if (!ehCelular()) toast('½ unidade adicionada ao pedido.', 'info');
         }
 
         function atualizarItensPedido() {
             const container = document.getElementById('itensPedido');
             const lista = document.getElementById('listaItensPedido');
+            atualizarBarraPedido();
             if (dados.pedidoAtual.itens.length === 0) { container.style.display = 'none'; return; }
             container.style.display = 'block';
             lista.innerHTML = dados.pedidoAtual.itens.map((item, index) => `
@@ -3441,6 +3598,11 @@
                 });
                 document.getElementById('novaCategoria').addEventListener('keypress', e => { if (e.key === 'Enter') adicionarCategoria(); });
                 document.getElementById('novaCategoriaSaida').addEventListener('keypress', e => { if (e.key === 'Enter') adicionarCategoriaSaida(); });
+
+                // Celular: sempre que as listas forem redesenhadas, viram cartões
+                new MutationObserver(agendarPrepararMobile).observe(document.querySelector('.container'), { childList: true, subtree: true });
+                prepararTabelasMobile();
+                window.addEventListener('resize', atualizarBarraPedido);
 
                 window.addEventListener('offline', () => statusSync('🔴 Sem conexão com a internet', 'bg-red-100 text-red-700'));
                 window.addEventListener('online', () => {
