@@ -6,7 +6,12 @@
     <meta name="theme-color" content="#ea580c">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Chef Pereira">
     <title>Chef Pereira - Controle</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-app-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-auth-compat.min.js"></script>
@@ -134,6 +139,8 @@
             <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
                 <h1 class="text-3xl font-bold text-gray-900">🍕 Sistema de Gestão - Chef Pereira</h1>
                 <div class="flex items-center gap-2">
+                    <button id="btnInstalar" onclick="instalarApp()" style="display: none;"
+                            class="text-xs px-3 py-1 rounded-full bg-orange-600 text-white hover:bg-orange-700 font-medium">📲 Instalar app</button>
                     <span id="syncStatus" class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">⚪ Conectando...</span>
                     <span id="usuarioLogado" class="text-xs text-gray-600"></span>
                     <button onclick="sairDaConta()" class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200">Sair</button>
@@ -172,6 +179,7 @@
 
         <!-- ===================== DASHBOARD ===================== -->
         <div id="dashboard" class="tab-content active">
+            <div id="avisoBackup"></div>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-6">
                 <div class="bg-white p-6 rounded-lg shadow">
                     <div class="flex items-center justify-between">
@@ -783,7 +791,7 @@
                 <div class="bg-white p-6 rounded-lg shadow">
                     <h3 class="text-lg font-semibold mb-4">Gerenciar Categorias de Produtos</h3>
                     <div class="flex gap-2 mb-4">
-                        <input type="text" id="novaCategoria" placeholder="Nova categoria" class="flex-1 px-3 py-2 border rounded-md">
+                        <input type="text" id="novaCategoria" placeholder="Nova categoria" class="flex-1 min-w-0 px-3 py-2 border rounded-md">
                         <button onclick="adicionarCategoria()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
                             ➕ Adicionar
                         </button>
@@ -795,7 +803,7 @@
             <div class="bg-white p-6 rounded-lg shadow mt-6">
                 <h3 class="text-lg font-semibold mb-4">Gerenciar Categorias de Saídas</h3>
                 <div class="flex gap-2 mb-4">
-                    <input type="text" id="novaCategoriaSaida" placeholder="Nova categoria de saída" class="flex-1 px-3 py-2 border rounded-md">
+                    <input type="text" id="novaCategoriaSaida" placeholder="Nova categoria de saída" class="flex-1 min-w-0 px-3 py-2 border rounded-md">
                     <button onclick="adicionarCategoriaSaida()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
                         ➕ Adicionar
                     </button>
@@ -806,27 +814,48 @@
             <div class="bg-white p-6 rounded-lg shadow mt-6">
                 <h3 class="text-lg font-semibold mb-4">🔄 Sincronização entre Dispositivos</h3>
                 <p class="text-sm text-gray-600">
-                    O sistema já está conectado ao Firebase (projeto <strong>chef-pereira-gestao</strong>) e sincroniza automaticamente
-                    entre todos os aparelhos onde você entrar com a mesma conta Google autorizada. Usuário atual:
-                    <strong id="configUsuarioLogado">-</strong>.
+                    O sistema sincroniza automaticamente pelo Firebase (projeto <strong>chef-pereira-gestao</strong>) entre todos os aparelhos
+                    onde você entrar com uma conta Google autorizada. Funciona também sem internet: o que for lançado offline é enviado quando a conexão voltar.
+                    Usuário atual: <strong id="configUsuarioLogado">-</strong>.
                 </p>
                 <p class="text-xs text-gray-500 mt-2">Para autorizar outro usuário, adicione o e-mail dele nas regras de segurança do Firestore, no console do Firebase.</p>
             </div>
 
             <div class="bg-white p-6 rounded-lg shadow mt-6">
-                <h3 class="text-lg font-semibold mb-4">Backup & Restore</h3>
-                <div class="flex flex-wrap gap-4">
+                <h3 class="text-lg font-semibold mb-1">📲 App no celular e no computador</h3>
+                <p class="text-sm text-gray-600 mb-3">Instale o Chef Pereira como aplicativo: ganha ícone na tela inicial, abre em tela cheia e funciona sem internet (o que for lançado offline é enviado quando a conexão voltar).</p>
+                <p id="infoAppInstalado" class="text-sm mb-3"></p>
+                <button id="btnInstalarConfig" onclick="instalarApp()" style="display: none;" class="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 mb-3">📲 Instalar agora</button>
+                <ul class="text-sm text-gray-600 space-y-1 list-disc pl-5">
+                    <li><strong>Android (Chrome):</strong> toque no botão acima ou no menu ⋮ → <em>Instalar app</em> / <em>Adicionar à tela inicial</em>.</li>
+                    <li><strong>iPhone (Safari):</strong> toque em Compartilhar <span class="whitespace-nowrap">(□↑)</span> → <em>Adicionar à Tela de Início</em>.</li>
+                    <li><strong>Computador (Chrome/Edge):</strong> ícone de instalar na barra de endereço ou o botão acima.</li>
+                </ul>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow mt-6">
+                <h3 class="text-lg font-semibold mb-1">💾 Backup</h3>
+                <p class="text-sm text-gray-600 mb-1">Baixe uma cópia de tudo para guardar no celular, computador ou Google Drive. O ideal é fazer pelo menos uma vez por semana.</p>
+                <p class="text-sm mb-4">Último backup: <strong id="infoUltimoBackup">nunca</strong></p>
+                <div class="flex flex-wrap gap-2">
                     <button onclick="exportarDados()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
-                        📥 Fazer Backup
+                        📥 Backup completo (.json)
                     </button>
-                    <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importarDados(event)">
-                    <button onclick="document.getElementById('importFile').click()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
-                        📤 Restaurar Backup
+                    <button onclick="exportarExcel()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+                        📊 Planilha Excel (.xlsx)
+                    </button>
+                    <input type="file" id="importFile" accept=".json,application/json" style="display: none;" onchange="importarDados(event)">
+                    <button onclick="document.getElementById('importFile').click()" class="bg-gray-700 text-white px-4 py-2 rounded-md hover:bg-gray-800">
+                        📤 Restaurar backup
                     </button>
                     <button onclick="limparDados()" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">
-                        🗑️ Limpar Dados
+                        🗑️ Limpar dados
                     </button>
                 </div>
+                <p class="text-xs text-gray-500 mt-3">
+                    O <strong>.json</strong> serve para restaurar o sistema. A <strong>planilha</strong> é para consultar no Excel/Google Planilhas (pedidos, itens, clientes, produtos, receitas, ingredientes, saídas).
+                    Antes de restaurar ou limpar, o sistema baixa sozinho uma cópia de segurança do estado atual.
+                </p>
             </div>
         </div>
     </div>
@@ -978,6 +1007,16 @@
             ['produtos', 'pedidos', 'saidas', 'ingredientes', 'receitas', 'clientes', 'movimentacoesEstoque'].forEach(k => {
                 if (!Array.isArray(dados[k])) dados[k] = [];
             });
+            // Todo registro precisa de um id único (cada um vira um registro na nuvem)
+            let proximoId = Date.now();
+            ['produtos', 'pedidos', 'saidas', 'ingredientes', 'receitas', 'clientes', 'movimentacoesEstoque'].forEach(k => {
+                dados[k] = dados[k].filter(x => x && typeof x === 'object');
+                const vistos = new Set();
+                dados[k].forEach(x => {
+                    if (x.id == null || vistos.has(String(x.id))) x.id = proximoId++ + Math.random();
+                    vistos.add(String(x.id));
+                });
+            });
             dados.ingredientes.forEach(i => {
                 i.precoUnidade = i.preco / i.quantidade;
                 if (i.estoque === undefined) i.estoque = null;
@@ -994,7 +1033,6 @@
                     if (prod) r.precoVenda = prod.preco;
                 }
             });
-            dados.receitaAtual = null;
             if (!dados.pedidoAtual || !Array.isArray(dados.pedidoAtual.itens)) dados.pedidoAtual = { itens: [], total: 0 };
             if (!Array.isArray(dados.simulacao)) dados.simulacao = [];
             if (!dados.configuracoes) dados.configuracoes = {};
@@ -1008,6 +1046,7 @@
                 try { dados = { ...dados, ...JSON.parse(salvos) }; }
                 catch (e) { console.error('Erro ao ler dados salvos:', e); }
             }
+            dados.receitaAtual = null;
             normalizarDados();
 
             const hoje = hojeLocal();
@@ -1016,15 +1055,21 @@
             document.getElementById('dataPedido').value = hoje;
             document.getElementById('dataSaida').value = hoje;
             document.getElementById('horaPedido').value = new Date().toTimeString().slice(0, 5);
-            document.getElementById('metaMensal').value = dados.configuracoes.meta;
-            document.getElementById('nomePizzaria').value = dados.configuracoes.nome || '';
-            document.getElementById('telefonePizzaria').value = dados.configuracoes.telefone || '';
-            document.getElementById('enderecoPizzaria').value = dados.configuracoes.endereco || '';
+            preencherCamposConfig();
+        }
+
+        // Campos que mostram configurações (atualizados também quando chegam da nuvem)
+        function preencherCamposConfig() {
+            const campos = { metaMensal: dados.configuracoes.meta, nomePizzaria: dados.configuracoes.nome, telefonePizzaria: dados.configuracoes.telefone, enderecoPizzaria: dados.configuracoes.endereco };
+            Object.entries(campos).forEach(([id, valor]) => {
+                const el = document.getElementById(id);
+                if (el && document.activeElement !== el) el.value = valor ?? '';
+            });
         }
 
         // Salva neste aparelho (com o rascunho de pedido) e envia para a nuvem (sem o rascunho)
         function salvarDados() {
-            localStorage.setItem('pizzaria_dados', JSON.stringify({ ...dados, receitaAtual: null, simulacao: [] }));
+            salvarLocal();
             enviarParaNuvem();
         }
 
@@ -1040,10 +1085,21 @@
             appId: "1:143928251939:web:42d43cb855b1e183ccc396"
         };
 
-        let syncDocRef = null;
-        let syncUnsub = null;
-        let syncIgnorarProximoEco = false;
+        // Estrutura na nuvem (formato 2):
+        //   loja/principal                      -> configurações + versão
+        //   loja/principal/produtos/{id}        -> um documento por registro (também ingredientes, receitas, clientes)
+        //   loja/principal/pedidos/{quinzena}   -> { itens: { id: pedido } } (também saídas e movimentações)
+        // Assim nenhum documento chega perto do limite de 1 MB e o app lê pouco ao abrir.
+        const VERSAO_NUVEM = 2;
+        const COLECOES_POR_DOC = ['produtos', 'ingredientes', 'receitas', 'clientes'];
+        const COLECOES_POR_QUINZENA = ['pedidos', 'saidas', 'movimentacoesEstoque'];
+        const COLECOES_SYNC = [...COLECOES_POR_DOC, ...COLECOES_POR_QUINZENA];
+        const COLECOES_ORDENADAS = ['produtos', 'ingredientes', 'receitas']; // a ordem manual (arrastar) importa
+
+        let nuvem = null;          // sessão de sincronização atual
         let syncTimeout = null;
+        let syncRetryTimeout = null;
+        let renderTimeout = null;
 
         function statusSync(texto, classe) {
             const el = document.getElementById('syncStatus');
@@ -1053,9 +1109,90 @@
             el.className = 'text-xs px-2 py-1 rounded-full transition-colors duration-300 ' + classe + pulsando;
         }
 
+        const STATUS = {
+            ok: () => statusSync('🟢 Sincronizado', 'bg-green-100 text-green-700'),
+            salvando: () => statusSync('🟡 Salvando...', 'bg-yellow-100 text-yellow-700'),
+            offline: () => statusSync('🟠 Offline — salvo no aparelho', 'bg-orange-100 text-orange-700')
+        };
+
+        // JSON com chaves em ordem fixa, para comparar registros sem falso "mudou"
+        function jsonEstavel(v) {
+            if (Array.isArray(v)) return '[' + v.map(jsonEstavel).join(',') + ']';
+            if (v && typeof v === 'object') return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + jsonEstavel(v[k])).join(',') + '}';
+            return JSON.stringify(v === undefined ? null : v);
+        }
+
+        // Remove undefined/funções e troca Infinity/NaN por null (o Firestore não aceita)
+        function limparParaNuvem(obj) { return JSON.parse(JSON.stringify(obj === undefined ? null : obj)); }
+
+        function quinzenaDe(item) {
+            const d = String((item && item.data) || '');
+            if (!/^\d{4}-\d{2}-\d{2}/.test(d)) return 'sem-data';
+            return d.slice(0, 7) + (Number(d.slice(8, 10)) <= 15 ? '-1' : '-2');
+        }
+
+        function docDoItem(col, item, indice) {
+            const d = limparParaNuvem(item);
+            if (COLECOES_ORDENADAS.includes(col)) d._ordem = indice;
+            return d;
+        }
+
+        function itemDoDoc(d) { const it = { ...d }; delete it._ordem; return it; }
+
+        // Troca o conteúdo do objeto mantendo a mesma referência (ex.: receita aberta no editor)
+        function substituirEmLugar(alvo, novo) {
+            Object.keys(alvo).forEach(k => { if (!(k in novo)) delete alvo[k]; });
+            Object.assign(alvo, novo);
+            return alvo;
+        }
+
+        function ordenarColecao(col, s) {
+            if (COLECOES_ORDENADAS.includes(col)) {
+                const ordem = id => {
+                    const e = s.espelho[col].get(String(id));
+                    if (!e) return Infinity; // ainda não enviado: fica no fim
+                    try { const o = JSON.parse(e.json)._ordem; return typeof o === 'number' ? o : Infinity; } catch (er) { return Infinity; }
+                };
+                dados[col].sort((a, b) => (ordem(a.id) - ordem(b.id)) || (Number(a.id) - Number(b.id)) || 0);
+            } else {
+                dados[col].sort((a, b) => (Number(a.id) - Number(b.id)) || 0);
+            }
+        }
+
+        function salvarLocal() {
+            try {
+                localStorage.setItem('pizzaria_dados', JSON.stringify({ ...dados, receitaAtual: null, simulacao: [] }));
+            } catch (e) {
+                // Aparelho sem espaço: tudo bem, o Firebase mantém a cópia offline dele
+                console.warn('Não foi possível salvar a cópia local:', e);
+            }
+        }
+
+        function agendarRender() {
+            clearTimeout(renderTimeout);
+            renderTimeout = setTimeout(() => atualizarAba(abaAtiva()), 120);
+        }
+
+        function erroSync(err) {
+            console.error('Erro de sincronização:', err);
+            const code = err && err.code;
+            if (code === 'permission-denied') {
+                const u = firebase.auth().currentUser;
+                statusSync('🔴 Sem permissão', 'bg-red-100 text-red-700');
+                toast(`O e-mail ${u ? u.email : ''} não tem permissão no Firebase. Confira as regras de segurança.`, 'erro');
+            } else if (code === 'unavailable' || !navigator.onLine) {
+                STATUS.offline();
+            } else {
+                statusSync('🔴 Erro de conexão', 'bg-red-100 text-red-700');
+            }
+        }
+
         function initSync() {
             try {
                 if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+                // Guarda uma cópia no aparelho: abre e salva mesmo sem internet
+                firebase.firestore().enablePersistence({ synchronizeTabs: true })
+                    .catch(e => console.warn('Modo offline do Firebase indisponível neste navegador:', e.code || e));
                 statusSync('🟡 Verificando login...', 'bg-yellow-100 text-yellow-700');
                 firebase.auth().onAuthStateChanged(user => {
                     const gate = document.getElementById('loginGate');
@@ -1064,14 +1201,13 @@
                         setTimeout(() => { gate.style.display = 'none'; }, 300);
                         document.getElementById('usuarioLogado').textContent = user.displayName || user.email || '';
                         document.getElementById('configUsuarioLogado').textContent = user.displayName ? `${user.displayName} (${user.email})` : (user.email || '-');
-                        conectarDocumentoSync();
+                        conectarNuvem();
                     } else {
                         gate.style.display = 'flex';
                         gate.style.opacity = '1';
                         document.getElementById('usuarioLogado').textContent = '';
                         statusSync('⚪ Não conectado', 'bg-gray-100 text-gray-600');
-                        if (syncUnsub) { syncUnsub(); syncUnsub = null; }
-                        syncDocRef = null;
+                        desconectarNuvem();
                     }
                 });
             } catch (e) {
@@ -1099,49 +1235,401 @@
         }
 
         async function sairDaConta() {
-            if (await confirmarAcao('Deseja sair da conta neste aparelho?')) firebase.auth().signOut();
+            if (await confirmarAcao('Deseja sair da conta neste aparelho?')) {
+                await sincronizarAgora();
+                firebase.auth().signOut();
+            }
         }
 
-        function conectarDocumentoSync() {
-            statusSync('🟡 Conectando...', 'bg-yellow-100 text-yellow-700');
-            syncDocRef = firebase.firestore().collection('pizzaria').doc('dados');
+        function desconectarNuvem() {
+            if (nuvem) nuvem.unsubs.forEach(u => { try { u(); } catch (e) { } });
+            nuvem = null;
+        }
 
-            if (syncUnsub) syncUnsub();
-            syncUnsub = syncDocRef.onSnapshot(doc => {
-                if (!doc.exists) { enviarParaNuvem(); return; }
-                if (syncIgnorarProximoEco) { syncIgnorarProximoEco = false; return; }
-                const remoto = doc.data();
-                if (remoto && remoto.dados) {
-                    // O rascunho de pedido nunca vem da nuvem: cada aparelho mantém o seu
-                    dados = { ...dados, ...remoto.dados, pedidoAtual: dados.pedidoAtual };
-                    normalizarDados();
-                    localStorage.setItem('pizzaria_dados', JSON.stringify({ ...dados, receitaAtual: null, simulacao: [] }));
-                    atualizarAba(abaAtiva());
+        function refColecao(s, col) { return s.raiz.collection(col); }
+
+        async function executarEmLotes(db, ops) {
+            for (let i = 0; i < ops.length; i += 400) {
+                const lote = db.batch();
+                ops.slice(i, i + 400).forEach(op => op(lote));
+                await lote.commit();
+            }
+        }
+
+        async function conectarNuvem() {
+            desconectarNuvem();
+            statusSync('🟡 Conectando...', 'bg-yellow-100 text-yellow-700');
+            const db = firebase.firestore();
+            const s = {
+                db,
+                raiz: db.collection('loja').doc('principal'),
+                unsubs: [],
+                espelho: {},            // o que este aparelho sabe que está na nuvem: col -> Map(id -> {json, balde})
+                espelhoConfig: null,
+                prontas: new Set(),
+                pronto: false
+            };
+            COLECOES_SYNC.forEach(col => { s.espelho[col] = new Map(); });
+            nuvem = s;
+            try {
+                const snapRaiz = await s.raiz.get();
+                if (s !== nuvem) return;
+                const info = snapRaiz.exists ? snapRaiz.data() : null;
+                if (!info || !(info.versao >= VERSAO_NUVEM)) await migrarParaFormatoNovo(s);
+                else await importarNovidadesDoFormatoAntigo(s, info);
+            } catch (e) {
+                if (s === nuvem) {
+                    erroSync(e);
+                    // Sem internet na abertura: tenta de novo quando a conexão voltar
+                    if (!navigator.onLine) window.addEventListener('online', () => { if (s === nuvem) conectarNuvem(); }, { once: true });
                 }
-                statusSync('🟢 Sincronizado', 'bg-green-100 text-green-700');
-            }, err => {
-                console.error('Erro de sincronização:', err);
-                statusSync('🔴 Erro de conexão', 'bg-red-100 text-red-700');
+                return;
+            }
+            if (s !== nuvem) return;
+            ouvirNuvem(s);
+        }
+
+        // Primeira vez no formato novo: copia tudo do documento antigo (pizzaria/dados) — ele fica guardado como backup
+        async function migrarParaFormatoNovo(s) {
+            statusSync('🟡 Atualizando formato dos dados...', 'bg-yellow-100 text-yellow-700');
+            let antigo = null;
+            try {
+                const snap = await s.db.collection('pizzaria').doc('dados').get();
+                if (snap.exists && snap.data() && snap.data().dados) antigo = snap.data();
+            } catch (e) {
+                console.warn('Não foi possível ler o formato antigo:', e);
+            }
+            if (antigo) {
+                dados = { ...dados, ...antigo.dados, pedidoAtual: dados.pedidoAtual };
+                normalizarDados();
+            }
+            const ops = [];
+            const baldes = new Set();
+            COLECOES_POR_DOC.forEach(col => dados[col].forEach((item, i) => {
+                if (item && item.id != null) ops.push(b => b.set(refColecao(s, col).doc(String(item.id)), docDoItem(col, item, i)));
+            }));
+            COLECOES_POR_QUINZENA.forEach(col => {
+                const porBalde = {};
+                dados[col].forEach(item => {
+                    if (!item || item.id == null) return;
+                    const q = quinzenaDe(item);
+                    (porBalde[q] = porBalde[q] || {})[String(item.id)] = limparParaNuvem(item);
+                });
+                Object.entries(porBalde).forEach(([q, itens]) => {
+                    baldes.add(col + '/' + q);
+                    ops.push(b => b.set(refColecao(s, col).doc(q), { quinzena: q, itens }));
+                });
+            });
+            await executarEmLotes(s.db, ops);
+            // A versão só é marcada depois que tudo foi copiado
+            await s.raiz.set({
+                versao: VERSAO_NUVEM,
+                configuracoes: limparParaNuvem(dados.configuracoes),
+                migradoEm: antigo && antigo.atualizadoEm ? antigo.atualizadoEm : new Date().toISOString(),
+                migradoDe: antigo ? 'pizzaria/dados' : 'aparelho',
+                migradoPor: usuarioNome()
+            }, { merge: true });
+            toast('Dados atualizados para o novo formato da nuvem ✅', 'sucesso');
+        }
+
+        // Se algum aparelho ainda com a versão antiga do app salvou depois da migração, traz os registros novos dele
+        async function importarNovidadesDoFormatoAntigo(s, info) {
+            let snap;
+            try { snap = await s.db.collection('pizzaria').doc('dados').get(); } catch (e) { return; }
+            if (!snap.exists) return;
+            const antigo = snap.data() || {};
+            if (!antigo.atualizadoEm || !info.migradoEm || antigo.atualizadoEm <= info.migradoEm || !antigo.dados) return;
+
+            const ops = [];
+            let novos = 0;
+            // Só registros criados depois da migração (o id é a hora de criação) — assim nada apagado depois "ressuscita"
+            const limite = Date.parse(info.migradoEm) || 0;
+            for (const col of COLECOES_SYNC) {
+                const atuais = await refColecao(s, col).get();
+                const ids = new Set();
+                atuais.docs.forEach(d => {
+                    if (COLECOES_POR_DOC.includes(col)) ids.add(d.id);
+                    else Object.keys((d.data() || {}).itens || {}).forEach(id => ids.add(id));
+                });
+                (antigo.dados[col] || []).forEach(item => {
+                    if (!item || item.id == null || ids.has(String(item.id)) || !(Number(item.id) > limite)) return;
+                    novos++;
+                    const id = String(item.id);
+                    if (COLECOES_POR_DOC.includes(col)) {
+                        ops.push(b => b.set(refColecao(s, col).doc(id), docDoItem(col, item, 100000 + novos)));
+                    } else {
+                        const ref = refColecao(s, col).doc(quinzenaDe(item));
+                        ops.push(b => b.set(ref, { quinzena: quinzenaDe(item) }, { merge: true }));
+                        ops.push(b => b.update(ref, new firebase.firestore.FieldPath('itens', id), limparParaNuvem(item)));
+                    }
+                });
+            }
+            await executarEmLotes(s.db, ops);
+            await s.raiz.set({ migradoEm: antigo.atualizadoEm }, { merge: true });
+            if (novos) toast(`${novos} registro(s) feitos em aparelho com a versão antiga foram trazidos ✅`, 'info');
+        }
+
+        function ouvirNuvem(s) {
+            const marcarPronta = (chave, metadata) => {
+                s.prontas.add(chave);
+                if (!s.pronto && s.prontas.size === COLECOES_SYNC.length + 1) {
+                    s.pronto = true;
+                    preencherCamposConfig();
+                    salvarLocal();
+                    agendarRender();
+                    enviarParaNuvem(); // manda o que tiver mudado enquanto conectava
+                }
+                if (s.pronto && metadata) {
+                    if (metadata.fromCache && !navigator.onLine) STATUS.offline();
+                    else if (!metadata.hasPendingWrites) STATUS.ok();
+                }
+            };
+
+            // Configurações
+            s.unsubs.push(s.raiz.onSnapshot(doc => {
+                if (s !== nuvem) return;
+                const cfg = doc.exists ? doc.data().configuracoes : null;
+                if (cfg) {
+                    const json = jsonEstavel(limparParaNuvem(cfg));
+                    if (json !== s.espelhoConfig) {           // mudou de verdade na nuvem
+                        s.espelhoConfig = json;
+                        if (jsonEstavel(limparParaNuvem(dados.configuracoes)) !== json) {
+                            dados.configuracoes = cfg;
+                            normalizarDados();
+                            preencherCamposConfig();
+                            salvarLocal();
+                            agendarRender();
+                        }
+                    }
+                }
+                marcarPronta('_config', doc.metadata);
+            }, erroSync));
+
+            // Um documento por registro
+            COLECOES_POR_DOC.forEach(col => {
+                let primeira = true;
+                s.unsubs.push(refColecao(s, col).onSnapshot(snap => {
+                    if (s !== nuvem) return;
+                    const esp = s.espelho[col];
+                    let mudou = false;
+                    if (primeira) {
+                        // Ao conectar, a nuvem é a fonte da verdade
+                        primeira = false;
+                        const existentes = new Map(dados[col].map(x => [String(x.id), x]));
+                        dados[col] = snap.docs.map(d => {
+                            const data = d.data();
+                            esp.set(d.id, { json: jsonEstavel(data), balde: null });
+                            const atual = existentes.get(d.id);
+                            return atual ? substituirEmLugar(atual, itemDoDoc(data)) : itemDoDoc(data);
+                        });
+                        mudou = true;
+                    } else {
+                        snap.docChanges().forEach(ch => {
+                            const id = ch.doc.id;
+                            if (ch.type === 'removed') {
+                                if (!esp.has(id)) return;                 // apagado por este aparelho
+                                esp.delete(id);
+                                const i = dados[col].findIndex(x => String(x.id) === id);
+                                if (i >= 0) { dados[col].splice(i, 1); mudou = true; }
+                                return;
+                            }
+                            const data = ch.doc.data();
+                            const json = jsonEstavel(data);
+                            const ant = esp.get(id);
+                            if (ant && ant.json === json) return;        // eco do que este aparelho salvou
+                            esp.set(id, { json, balde: null });
+                            const atual = dados[col].find(x => String(x.id) === id);
+                            if (atual) substituirEmLugar(atual, itemDoDoc(data));
+                            else dados[col].push(itemDoDoc(data));
+                            mudou = true;
+                        });
+                    }
+                    if (mudou) { ordenarColecao(col, s); salvarLocal(); if (s.pronto) agendarRender(); }
+                    marcarPronta(col, snap.metadata);
+                }, erroSync));
+            });
+
+            // Agrupados por quinzena
+            COLECOES_POR_QUINZENA.forEach(col => {
+                let primeira = true;
+                s.unsubs.push(refColecao(s, col).onSnapshot(snap => {
+                    if (s !== nuvem) return;
+                    const esp = s.espelho[col];
+                    let mudou = false;
+                    if (primeira) {
+                        primeira = false;
+                        const existentes = new Map(dados[col].map(x => [String(x.id), x]));
+                        const lista = new Map();
+                        snap.docs.forEach(d => {
+                            const itens = (d.data() || {}).itens || {};
+                            Object.entries(itens).forEach(([id, item]) => {
+                                if (!item) return;
+                                esp.set(id, { json: jsonEstavel(item), balde: d.id });
+                                const atual = existentes.get(id);
+                                lista.set(id, atual ? substituirEmLugar(atual, item) : item);
+                            });
+                        });
+                        dados[col] = [...lista.values()];
+                        mudou = true;
+                    } else {
+                        snap.docChanges().forEach(ch => {
+                            const balde = ch.doc.id;
+                            const itens = ch.type === 'removed' ? {} : ((ch.doc.data() || {}).itens || {});
+                            // Registros que estavam nesta quinzena e sumiram
+                            esp.forEach((e, id) => {
+                                if (e.balde !== balde || id in itens) return;
+                                esp.delete(id);
+                                const i = dados[col].findIndex(x => String(x.id) === id);
+                                if (i >= 0) { dados[col].splice(i, 1); mudou = true; }
+                            });
+                            // Registros novos ou alterados
+                            Object.entries(itens).forEach(([id, item]) => {
+                                if (!item) return;
+                                const json = jsonEstavel(item);
+                                const ant = esp.get(id);
+                                if (ant && ant.json === json && ant.balde === balde) return; // eco
+                                esp.set(id, { json, balde });
+                                const atual = dados[col].find(x => String(x.id) === id);
+                                if (atual) substituirEmLugar(atual, item);
+                                else dados[col].push(item);
+                                mudou = true;
+                            });
+                        });
+                    }
+                    if (mudou) { ordenarColecao(col, s); salvarLocal(); if (s.pronto) agendarRender(); }
+                    marcarPronta(col, snap.metadata);
+                }, erroSync));
             });
         }
 
         function enviarParaNuvem() {
-            if (!syncDocRef) return;
             clearTimeout(syncTimeout);
-            syncTimeout = setTimeout(async () => {
-                try {
-                    syncIgnorarProximoEco = true;
-                    await syncDocRef.set({
-                        dados: { ...dados, receitaAtual: null, simulacao: [], pedidoAtual: { itens: [], total: 0 } },
-                        atualizadoEm: new Date().toISOString()
-                    });
-                } catch (e) {
-                    syncIgnorarProximoEco = false;
-                    console.error('Erro ao enviar para nuvem:', e);
-                    statusSync('🔴 Erro ao salvar na nuvem', 'bg-red-100 text-red-700');
-                }
-            }, 800);
+            syncTimeout = setTimeout(enviarDiferencas, 400);
         }
+
+        // Garante que o que está na memória foi mandado (antes de sair, recarregar, restaurar...)
+        function sincronizarAgora() {
+            clearTimeout(syncTimeout);
+            return enviarDiferencas();
+        }
+
+        // Compara a memória com o espelho da nuvem e manda só o que mudou
+        function enviarDiferencas() {
+            const s = nuvem;
+            if (!s || !s.pronto) return Promise.resolve();
+            const ops = [];
+            const tocados = [];          // para refazer se der erro
+            const FP = firebase.firestore.FieldPath;
+
+            COLECOES_POR_DOC.forEach(col => {
+                const esp = s.espelho[col];
+                const vistos = new Set();
+                dados[col].forEach((item, i) => {
+                    if (!item || item.id == null) return;
+                    const id = String(item.id);
+                    if (vistos.has(id)) return;
+                    vistos.add(id);
+                    const doc = docDoItem(col, item, i);
+                    const json = jsonEstavel(doc);
+                    const ant = esp.get(id);
+                    if (ant && ant.json === json) return;
+                    esp.set(id, { json, balde: null });
+                    tocados.push([col, id]);
+                    ops.push(b => b.set(refColecao(s, col).doc(id), doc));
+                });
+                [...esp.keys()].forEach(id => {
+                    if (vistos.has(id)) return;
+                    esp.delete(id);
+                    tocados.push([col, id, 'apagado']);
+                    ops.push(b => b.delete(refColecao(s, col).doc(id)));
+                });
+            });
+
+            COLECOES_POR_QUINZENA.forEach(col => {
+                const esp = s.espelho[col];
+                const vistos = new Set();
+                const garantidos = new Set();
+                const garantir = balde => {
+                    if (garantidos.has(balde)) return;
+                    garantidos.add(balde);
+                    ops.push(b => b.set(refColecao(s, col).doc(balde), { quinzena: balde }, { merge: true }));
+                };
+                const apagar = (balde, id) => {
+                    garantir(balde);
+                    ops.push(b => b.update(refColecao(s, col).doc(balde), new FP('itens', id), firebase.firestore.FieldValue.delete()));
+                };
+                dados[col].forEach(item => {
+                    if (!item || item.id == null) return;
+                    const id = String(item.id);
+                    if (vistos.has(id)) return;
+                    vistos.add(id);
+                    const doc = limparParaNuvem(item);
+                    const json = jsonEstavel(doc);
+                    const balde = quinzenaDe(item);
+                    const ant = esp.get(id);
+                    if (ant && ant.json === json && ant.balde === balde) return;
+                    if (ant && ant.balde && ant.balde !== balde) apagar(ant.balde, id); // mudou de data
+                    garantir(balde);
+                    ops.push(b => b.update(refColecao(s, col).doc(balde), new FP('itens', id), doc));
+                    esp.set(id, { json, balde });
+                    tocados.push([col, id]);
+                });
+                [...esp.entries()].forEach(([id, e]) => {
+                    if (vistos.has(id)) return;
+                    esp.delete(id);
+                    apagar(e.balde, id);
+                    tocados.push([col, id, 'apagado', e.balde]);
+                });
+            });
+
+            const cfg = limparParaNuvem(dados.configuracoes);
+            const jsonCfg = jsonEstavel(cfg);
+            let cfgTocada = false;
+            if (jsonCfg !== s.espelhoConfig) {
+                s.espelhoConfig = jsonCfg;
+                cfgTocada = true;
+                ops.push(b => b.set(s.raiz, { configuracoes: cfg, versao: VERSAO_NUVEM }, { mergeFields: ['configuracoes', 'versao'] }));
+            }
+
+            if (!ops.length) return Promise.resolve();
+            if (navigator.onLine) STATUS.salvando(); else STATUS.offline();
+
+            return executarEmLotes(s.db, ops).then(() => {
+                if (s === nuvem) { if (navigator.onLine) STATUS.ok(); else STATUS.offline(); }
+            }).catch(e => {
+                if (s !== nuvem) return;
+                // Marca como "não enviado" para mandar de novo na próxima vez
+                tocados.forEach(([col, id, apagado, balde]) => {
+                    const esp = s.espelho[col];
+                    if (apagado) esp.set(id, { json: '__erro__', balde: balde || null });
+                    else { const e2 = esp.get(id); if (e2) e2.json = '__erro__'; }
+                });
+                if (cfgTocada) s.espelhoConfig = '__erro__';
+                erroSync(e);
+                if (e && ['unavailable', 'deadline-exceeded', 'aborted', 'resource-exhausted'].includes(e.code)) {
+                    clearTimeout(syncRetryTimeout);
+                    syncRetryTimeout = setTimeout(enviarParaNuvem, 10000);
+                }
+            });
+        }
+
+        // Apaga tudo da nuvem no formato novo (usado por "Limpar dados")
+        async function apagarTudoNaNuvem() {
+            const s = nuvem;
+            if (!s) return;
+            const ops = [];
+            for (const col of COLECOES_SYNC) {
+                const snap = await refColecao(s, col).get();
+                snap.docs.forEach(d => ops.push(b => b.delete(d.ref)));
+                s.espelho[col].clear();
+            }
+            await executarEmLotes(s.db, ops);
+        }
+
+        // Antes de fechar/esconder o app, manda o que estiver pendente
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') sincronizarAgora(); });
+        window.addEventListener('pagehide', () => sincronizarAgora());
+
 
         // =====================================================================
         // NAVEGAÇÃO
@@ -1900,6 +2388,7 @@
         }
 
         function atualizarDashboard() {
+            atualizarAvisoBackup();
             const stats = calcularEstatisticas();
 
             document.getElementById('receitaTotal').textContent = formatarMoeda(stats.receita);
@@ -4255,6 +4744,8 @@
         // CONFIGURAÇÕES
         // =====================================================================
         function atualizarConfig() {
+            atualizarInfoBackup();
+            atualizarBotoesInstalar();
             atualizarListaCategorias();
             atualizarListaCategoriasSaidas();
             const u = firebase.auth().currentUser;
@@ -4363,61 +4854,266 @@
             atualizarCategoriasSaidas();
         }
 
-        function exportarDados() {
-            const backup = { ...dados, receitaAtual: null, simulacao: [], dataBackup: new Date().toISOString() };
-            const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+        // =====================================================================
+        // BACKUP
+        // =====================================================================
+        const DIAS_LEMBRETE_BACKUP = 7;
+
+        function baixarArquivo(conteudo, nome, tipo) {
+            const blob = conteudo instanceof Blob ? conteudo : new Blob([conteudo], { type: tipo });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `backup-pizzaria-${hojeLocal()}.json`;
+            a.download = nome;
+            document.body.appendChild(a);
             a.click();
-            URL.revokeObjectURL(url);
-            toast('Backup baixado!', 'sucesso');
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+        }
+
+        function dadosParaBackup() {
+            const { pedidoAtual, simulacao, receitaAtual, ...resto } = dados;
+            return { ...JSON.parse(JSON.stringify(resto)), dataBackup: new Date().toISOString(), feitoPor: usuarioNome(), versaoBackup: 2 };
+        }
+
+        function registrarBackupFeito() {
+            dados.configuracoes.ultimoBackup = { em: new Date().toISOString(), por: usuarioNome() };
+            salvarDados();
+            atualizarInfoBackup();
+            atualizarAvisoBackup();
+        }
+
+        // sufixo: usado nas cópias automáticas (antes de restaurar/limpar)
+        function exportarDados(sufixo) {
+            const hora = new Date().toTimeString().slice(0, 5).replace(':', 'h');
+            const nome = `backup-chef-pereira-${hojeLocal()}-${hora}${typeof sufixo === 'string' ? '-' + sufixo : ''}.json`;
+            baixarArquivo(JSON.stringify(dadosParaBackup(), null, 2), nome, 'application/json');
+            registrarBackupFeito();
+            if (typeof sufixo !== 'string') toast('Backup baixado! Guarde o arquivo num lugar seguro.', 'sucesso');
+        }
+
+        function carregarScript(src) {
+            return new Promise((ok, erro) => {
+                if (document.querySelector(`script[src="${src}"]`)) { ok(); return; }
+                const s = document.createElement('script');
+                s.src = src;
+                s.onload = ok;
+                s.onerror = () => erro(new Error('Falha ao carregar ' + src));
+                document.head.appendChild(s);
+            });
+        }
+
+        async function exportarExcel() {
+            try {
+                toast('Gerando planilha...', 'info');
+                if (typeof XLSX === 'undefined') await carregarScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+                const dataBR = d => d ? formatarData(d) : '';
+                const n2 = v => Math.round((Number(v) || 0) * 100) / 100;
+                const pedidos = [...dados.pedidos].sort((a, b) => (a.data + (a.hora || '')).localeCompare(b.data + (b.hora || '')));
+                const abas = {
+                    'Pedidos': pedidos.map(p => ({
+                        Data: dataBR(p.data), Hora: p.hora || '', Cliente: p.cliente || '', Telefone: p.telefone || '',
+                        Endereço: p.endereco || '', Pagamento: p.formaPagamento || '',
+                        Itens: (p.itens || []).map(i => `${i.nome} (${formatarQuantidade(i.quantidade)})`).join(', '),
+                        Total: n2(p.total), Observações: p.observacoes || '', 'Lançado por': p.criadoPor || ''
+                    })),
+                    'Itens dos pedidos': pedidos.flatMap(p => (p.itens || []).map(i => ({
+                        Data: dataBR(p.data), Cliente: p.cliente || '', Pagamento: p.formaPagamento || '',
+                        Produto: i.nome, Quantidade: i.quantidade, 'Preço unit.': n2(i.precoUnitario),
+                        'Custo unit.': n2(i.custoUnitario), Subtotal: n2(i.subtotal)
+                    }))),
+                    'Clientes': dados.clientes.map(c => {
+                        const ps = dados.pedidos.filter(p => p.clienteId === c.id || (normTel(c.telefone) && normTel(p.telefone) === normTel(c.telefone)));
+                        return {
+                            Nome: c.nome, Telefone: c.telefone || '', Endereço: c.endereco || '', Observações: c.observacoes || '',
+                            Pedidos: ps.length, 'Total gasto': n2(ps.reduce((s, p) => s + (p.total || 0), 0)),
+                            'Em aberto': n2(ps.filter(p => p.formaPagamento === 'Devedor').reduce((s, p) => s + (p.total || 0), 0))
+                        };
+                    }),
+                    'Produtos': dados.produtos.map(p => ({
+                        Produto: p.nome, Categoria: p.categoria, Custo: n2(p.custo), Preço: n2(p.preco),
+                        'Margem %': p.preco > 0 ? n2((1 - p.custo / p.preco) * 100) : '',
+                        'Tem receita': receitaDoProduto(p) ? 'Sim' : 'Não'
+                    })),
+                    'Receitas': dados.receitas.map(r => ({
+                        Receita: r.nome, Categoria: r.categoria, Custo: n2(r.custoTotal), 'Preço de venda': n2(r.precoVenda),
+                        Ingredientes: (r.ingredientes || []).map(i => `${i.nome}: ${formatarNumero(i.quantidade)} ${i.unidade}`).join('; ')
+                    })),
+                    'Ingredientes': dados.ingredientes.map(i => ({
+                        Ingrediente: i.nome, Preço: n2(i.preco), Quantidade: i.quantidade, Unidade: i.unidade,
+                        'Preço por unidade': Math.round((i.precoUnidade || 0) * 10000) / 10000,
+                        'Estoque atual': i.estoque ?? '', 'Estoque mínimo': i.estoqueMinimo ?? ''
+                    })),
+                    'Saídas': [...dados.saidas].sort((a, b) => String(a.data).localeCompare(String(b.data))).map(s => ({
+                        Data: dataBR(s.data), Descrição: s.descricao, Categoria: s.categoria, Pagamento: s.formaPagamento || '', Valor: n2(s.valor)
+                    })),
+                    'Movimentações estoque': dados.movimentacoesEstoque.map(m => ({
+                        Data: dataBR(m.data), Hora: m.hora || '', Ingrediente: m.nome, Tipo: m.tipo,
+                        Quantidade: m.quantidade, Unidade: m.unidade, Saldo: m.saldo, Por: m.por || ''
+                    }))
+                };
+                const wb = XLSX.utils.book_new();
+                Object.entries(abas).forEach(([nome, linhas]) => {
+                    const ws = XLSX.utils.json_to_sheet(linhas.length ? linhas : [{ Aviso: 'Sem registros' }]);
+                    const cab = Object.keys(linhas[0] || { Aviso: '' });
+                    ws['!cols'] = cab.map(c => ({ wch: Math.min(45, Math.max(c.length + 2, ...linhas.slice(0, 200).map(l => String(l[c] ?? '').length + 1))) }));
+                    XLSX.utils.book_append_sheet(wb, ws, nome.slice(0, 31));
+                });
+                const arquivo = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+                baixarArquivo(new Blob([arquivo], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+                    `chef-pereira-${hojeLocal()}.xlsx`);
+                registrarBackupFeito();
+                toast('Planilha baixada!', 'sucesso');
+            } catch (e) {
+                console.error('Erro ao gerar planilha:', e);
+                toast('Não foi possível gerar a planilha. Verifique a internet e tente de novo.', 'erro');
+            }
+        }
+
+        function diasDesdeBackup() {
+            const ub = dados.configuracoes.ultimoBackup;
+            if (!ub || !ub.em) return null;
+            return Math.floor((Date.now() - new Date(ub.em).getTime()) / 86400000);
+        }
+
+        function atualizarInfoBackup() {
+            const el = document.getElementById('infoUltimoBackup');
+            if (!el) return;
+            const ub = dados.configuracoes.ultimoBackup;
+            if (!ub || !ub.em) { el.textContent = 'nunca'; return; }
+            const d = diasDesdeBackup();
+            const quando = new Date(ub.em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+            el.textContent = `${quando}${ub.por ? ' por ' + ub.por : ''} (${d === 0 ? 'hoje' : d === 1 ? 'há 1 dia' : `há ${d} dias`})`;
+        }
+
+        function atualizarAvisoBackup() {
+            const el = document.getElementById('avisoBackup');
+            if (!el) return;
+            const temDados = dados.pedidos.length || dados.clientes.length || dados.receitas.length;
+            const d = diasDesdeBackup();
+            let adiado = 0;
+            try { adiado = Number(localStorage.getItem('pizzaria_backup_adiado') || 0); } catch (e) { }
+            if (!temDados || (d !== null && d < DIAS_LEMBRETE_BACKUP) || Date.now() < adiado) { el.innerHTML = ''; return; }
+            el.innerHTML = `
+                <div class="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-6 flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                        <p class="font-semibold text-blue-900">💾 ${d === null ? 'Você ainda não fez nenhum backup' : `Último backup foi há ${d} dias`}</p>
+                        <p class="text-sm text-blue-800">Leva 2 segundos e protege seus pedidos, clientes e receitas.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="exportarDados()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm">📥 Fazer backup agora</button>
+                        <button onclick="adiarLembreteBackup()" class="text-sm text-blue-700 hover:underline px-2">Amanhã</button>
+                    </div>
+                </div>`;
+        }
+
+        function adiarLembreteBackup() {
+            try { localStorage.setItem('pizzaria_backup_adiado', String(Date.now() + 86400000)); } catch (e) { }
+            atualizarAvisoBackup();
+        }
+
+        function backupValido(b) {
+            return b && typeof b === 'object' && ['produtos', 'pedidos', 'ingredientes', 'receitas', 'clientes', 'saidas'].some(k => Array.isArray(b[k]));
         }
 
         function importarDados(event) {
             const file = event.target.files[0];
+            event.target.value = '';
             if (!file) return;
             const reader = new FileReader();
             reader.onload = async function (e) {
+                let backup;
+                try { backup = JSON.parse(e.target.result); } catch (er) { toast('Arquivo inválido. Escolha um backup .json do sistema.', 'erro'); return; }
+                if (!backupValido(backup)) { toast('Esse arquivo não parece ser um backup do Chef Pereira.', 'erro'); return; }
+                if (!nuvem || !nuvem.pronto) { toast('Conecte-se à internet e espere ficar 🟢 Sincronizado para restaurar.', 'aviso'); return; }
+                const quando = backup.dataBackup ? new Date(backup.dataBackup).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'data desconhecida';
+                const resumo = `${(backup.pedidos || []).length} pedidos, ${(backup.clientes || []).length} clientes, ${(backup.produtos || []).length} produtos`;
+                if (!(await confirmarAcao(`Restaurar o backup de ${quando} (${resumo})? Tudo o que está no sistema agora será substituído em TODOS os aparelhos. Uma cópia do estado atual será baixada antes.`))) return;
+                exportarDados('antes-de-restaurar');
+                const { dataBackup, feitoPor, versaoBackup, ...conteudo } = backup;
+                fecharEditor();
+                dados = { ...dados, ...conteudo, pedidoAtual: dados.pedidoAtual, receitaAtual: null };
+                normalizarDados();
+                salvarLocal();
                 try {
-                    const backup = JSON.parse(e.target.result);
-                    if (await confirmarAcao('Tem certeza que deseja importar estes dados? Todos os dados atuais serão substituídos.')) {
-                        dados = { ...dados, ...backup };
-                        normalizarDados();
-                        salvarDados();
-                        setTimeout(() => location.reload(), 1200);
-                    }
-                } catch (error) {
-                    toast('Erro ao importar dados. Verifique o arquivo.', 'erro');
+                    await sincronizarAgora();
+                    toast('Backup restaurado com sucesso!', 'sucesso');
+                } catch (er) {
+                    toast('Backup restaurado neste aparelho; a nuvem será atualizada quando a conexão voltar.', 'aviso');
                 }
+                atualizarAba(abaAtiva());
             };
             reader.readAsText(file);
-            event.target.value = '';
         }
 
         async function limparDados() {
-            if (!(await confirmarAcao('ATENÇÃO: Isso apagará TODOS os dados — pedidos, clientes, produtos, ingredientes, estoque e saídas — em todos os aparelhos conectados (a nuvem também é limpa). Tem certeza?'))) return;
-            const dadosZerados = {
-                produtos: [], pedidos: [], saidas: [], ingredientes: [], receitas: [], clientes: [], movimentacoesEstoque: [],
-                configuracoes: {
-                    nome: dados.configuracoes.nome,
-                    telefone: dados.configuracoes.telefone,
-                    endereco: dados.configuracoes.endereco,
-                    meta: dados.configuracoes.meta,
-                    categorias: [...CATEGORIAS_PADRAO],
-                    categoriasSaidas: [...CATEGORIAS_SAIDAS_PADRAO]
-                },
-                pedidoAtual: { itens: [], total: 0 }
+            if (!(await confirmarAcao('ATENÇÃO: Isso apagará TODOS os dados — pedidos, clientes, produtos, ingredientes, estoque e saídas — em todos os aparelhos conectados. Uma cópia de segurança será baixada antes. Tem certeza?'))) return;
+            if (!nuvem || !nuvem.pronto) { toast('Conecte-se à internet e espere ficar 🟢 Sincronizado para limpar.', 'aviso'); return; }
+            exportarDados('antes-de-limpar');
+            const configuracoes = {
+                ...dados.configuracoes,
+                categorias: [...CATEGORIAS_PADRAO],
+                categoriasSaidas: [...CATEGORIAS_SAIDAS_PADRAO]
             };
             try {
-                if (syncDocRef) await syncDocRef.set({ dados: dadosZerados, atualizadoEm: new Date().toISOString() });
+                await apagarTudoNaNuvem();
             } catch (e) {
                 console.error('Erro ao limpar dados na nuvem:', e);
-                toast('Dados locais limpos, mas houve erro ao limpar a nuvem. Verifique a conexão.', 'erro');
+                toast('Não foi possível limpar a nuvem. Verifique a conexão e tente de novo.', 'erro');
+                return;
             }
-            localStorage.setItem('pizzaria_dados', JSON.stringify(dadosZerados));
-            location.reload();
+            ['produtos', 'pedidos', 'saidas', 'ingredientes', 'receitas', 'clientes', 'movimentacoesEstoque'].forEach(k => { dados[k] = []; });
+            dados.configuracoes = configuracoes;
+            dados.pedidoAtual = { itens: [], total: 0 };
+            fecharEditor();
+            normalizarDados();
+            salvarLocal();
+            await sincronizarAgora();
+            toast('Todos os dados foram apagados.', 'info');
+            atualizarAba(abaAtiva());
+        }
+
+        // =====================================================================
+        // APP INSTALÁVEL (PWA)
+        // =====================================================================
+        let pedidoInstalacao = null;
+
+        function appEstaInstalado() {
+            return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        }
+
+        function atualizarBotoesInstalar() {
+            const pode = !!pedidoInstalacao && !appEstaInstalado();
+            ['btnInstalar', 'btnInstalarConfig'].forEach(id => {
+                const b = document.getElementById(id);
+                if (b) b.style.display = pode ? '' : 'none';
+            });
+            const info = document.getElementById('infoAppInstalado');
+            if (info) info.innerHTML = appEstaInstalado()
+                ? '✅ Você está usando o app instalado.'
+                : (pedidoInstalacao ? '' : '<span class="text-gray-500">Se o botão de instalar não aparecer, use as instruções abaixo.</span>');
+        }
+
+        async function instalarApp() {
+            if (!pedidoInstalacao) { showTab('config'); toast('Siga as instruções em Config → App no celular.', 'info'); return; }
+            pedidoInstalacao.prompt();
+            const escolha = await pedidoInstalacao.userChoice;
+            pedidoInstalacao = null;
+            atualizarBotoesInstalar();
+            if (escolha && escolha.outcome === 'accepted') toast('App instalado! Procure o ícone Chef Pereira.', 'sucesso');
+        }
+
+        window.addEventListener('beforeinstallprompt', e => {
+            e.preventDefault();
+            pedidoInstalacao = e;
+            atualizarBotoesInstalar();
+        });
+        window.addEventListener('appinstalled', () => { pedidoInstalacao = null; atualizarBotoesInstalar(); });
+
+        if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(e => console.warn('Service worker não registrado:', e));
+            });
         }
 
         // =====================================================================
