@@ -9,6 +9,14 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Chef Pereira">
     <title>Chef Pereira - Controle</title>
+    <script>
+        (function () {
+            var tema = 'auto';
+            try { tema = localStorage.getItem('pizzaria_tema') || 'auto'; } catch (e) { }
+            var escuro = tema === 'escuro' || (tema === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            if (escuro) document.documentElement.classList.add('dark');
+        })();
+    </script>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon-192.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -48,6 +56,70 @@
         .nav-abas { scrollbar-width: none; -ms-overflow-style: none; }
         .nav-abas::-webkit-scrollbar { display: none; }
         .barra-pedido { display: none; }
+
+        /* ---------- Modo escuro ---------- */
+        html.dark { color-scheme: dark; }
+        html.dark body { background-color: #0b1220 !important; color: #e5e7eb; }
+        html.dark *, html.dark ::before, html.dark ::after { border-color: #334155; }
+        html.dark .bg-white { background-color: #172033 !important; }
+        html.dark .bg-gray-50 { background-color: #111a2b !important; }
+        html.dark .bg-gray-100 { background-color: #22304a !important; }
+        html.dark .bg-gray-200 { background-color: #2c3b57 !important; }
+        html.dark .hover\:bg-gray-50:hover, html.dark .hover\:bg-gray-100:hover { background-color: #22304a !important; }
+        html.dark .hover\:bg-gray-200:hover, html.dark .hover\:bg-gray-300:hover { background-color: #33435f !important; }
+        html.dark th.th-ordenavel:hover { background: #22304a; }
+
+        html.dark .text-gray-900 { color: #f8fafc !important; }
+        html.dark .text-gray-800 { color: #f1f5f9 !important; }
+        html.dark .text-gray-700 { color: #e2e8f0 !important; }
+        html.dark .text-gray-600 { color: #cbd5e1 !important; }
+        html.dark .text-gray-500 { color: #94a3b8 !important; }
+        html.dark .text-gray-400 { color: #8190a5 !important; }
+        html.dark .text-gray-300, html.dark .text-gray-200 { color: #475569 !important; }
+        html.dark .hover\:text-gray-600:hover { color: #e2e8f0 !important; }
+
+        /* Cores de destaque um pouco mais claras para ler no fundo escuro */
+        html.dark .text-green-600 { color: #4ade80 !important; }
+        html.dark .text-red-600 { color: #f87171 !important; }
+        html.dark .text-blue-600 { color: #60a5fa !important; }
+        html.dark .text-yellow-600 { color: #facc15 !important; }
+        html.dark .text-purple-600 { color: #c084fc !important; }
+        html.dark .text-orange-600 { color: #fb923c !important; }
+        html.dark .text-green-700, html.dark .text-green-800 { color: #86efac !important; }
+        html.dark .text-red-700, html.dark .text-red-800 { color: #fca5a5 !important; }
+        html.dark .text-blue-700, html.dark .text-blue-800, html.dark .text-blue-900 { color: #93c5fd !important; }
+        html.dark .text-yellow-700, html.dark .text-yellow-800, html.dark .text-yellow-900 { color: #fde047 !important; }
+        html.dark .text-orange-700 { color: #fdba74 !important; }
+        html.dark .text-purple-800 { color: #d8b4fe !important; }
+
+        /* Fundos claros coloridos (avisos, etiquetas) viram tons translúcidos */
+        html.dark .bg-yellow-50 { background-color: rgba(234, 179, 8, .10) !important; }
+        html.dark .bg-yellow-100, html.dark .hover\:bg-yellow-100:hover { background-color: rgba(234, 179, 8, .20) !important; }
+        html.dark .bg-blue-50 { background-color: rgba(59, 130, 246, .12) !important; }
+        html.dark .bg-blue-100, html.dark .hover\:bg-blue-100:hover { background-color: rgba(59, 130, 246, .22) !important; }
+        html.dark .bg-green-50 { background-color: rgba(34, 197, 94, .10) !important; }
+        html.dark .bg-green-100, html.dark .hover\:bg-green-100:hover { background-color: rgba(34, 197, 94, .20) !important; }
+        html.dark .bg-red-50 { background-color: rgba(239, 68, 68, .10) !important; }
+        html.dark .bg-red-100, html.dark .hover\:bg-red-100:hover { background-color: rgba(239, 68, 68, .20) !important; }
+        html.dark .bg-orange-100, html.dark .hover\:bg-orange-100:hover { background-color: rgba(249, 115, 22, .20) !important; }
+        html.dark .hover\:bg-orange-200:hover { background-color: rgba(249, 115, 22, .32) !important; }
+        html.dark .bg-purple-100 { background-color: rgba(168, 85, 247, .20) !important; }
+        html.dark .border-yellow-200, html.dark .border-yellow-300 { border-color: rgba(234, 179, 8, .35) !important; }
+        html.dark .border-blue-200 { border-color: rgba(59, 130, 246, .35) !important; }
+        html.dark .border-red-100, html.dark .border-red-200 { border-color: rgba(239, 68, 68, .35) !important; }
+        html.dark .border-orange-600 { border-color: #ea580c !important; }
+
+        /* Campos */
+        html.dark input:not([type="checkbox"]):not([type="radio"]), html.dark select, html.dark textarea {
+            background-color: #0f1828; color: #f1f5f9; border-color: #3b4a63;
+        }
+        html.dark input::placeholder, html.dark textarea::placeholder { color: #7a889c; }
+        html.dark input:focus, html.dark select:focus, html.dark textarea:focus { outline-color: #fb923c; }
+        html.dark .shadow, html.dark .shadow-lg { box-shadow: 0 1px 3px rgba(0, 0, 0, .5), 0 1px 2px rgba(0, 0, 0, .4) !important; }
+        html.dark .barra-pedido { background-color: #172033 !important; border-color: #334155 !important; }
+
+        /* Botão de tema */
+        .btn-tema { line-height: 1; }
 
         /* ---------- Celular ---------- */
         @media (max-width: 767px) {
@@ -104,6 +176,10 @@
             #toastContainer { left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); align-items: stretch !important; }
             body.com-barra #toastContainer { bottom: calc(96px + env(safe-area-inset-bottom)); }
             .toast-item { max-width: none !important; }
+
+            html.dark table.cards tr, html.dark table.cards tr:hover { background: #172033; border-color: #334155; }
+            html.dark table.cards td::before { color: #94a3b8; }
+            html.dark table.cards td.td-principal { border-bottom-color: #2a3850; }
         }
     </style>
 </head>
@@ -141,6 +217,7 @@
                 <div class="flex items-center gap-2">
                     <button id="btnInstalar" onclick="instalarApp()" style="display: none;"
                             class="text-xs px-3 py-1 rounded-full bg-orange-600 text-white hover:bg-orange-700 font-medium">📲 Instalar app</button>
+                    <button id="btnTema" onclick="alternarTema()" class="btn-tema text-base px-2 py-1 rounded-full bg-gray-100 hover:bg-gray-200" title="Modo claro/escuro">🌙</button>
                     <span id="syncStatus" class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">⚪ Conectando...</span>
                     <span id="usuarioLogado" class="text-xs text-gray-600"></span>
                     <button onclick="sairDaConta()" class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200">Sair</button>
@@ -819,6 +896,17 @@
                     Usuário atual: <strong id="configUsuarioLogado">-</strong>.
                 </p>
                 <p class="text-xs text-gray-500 mt-2">Para autorizar outro usuário, adicione o e-mail dele nas regras de segurança do Firestore, no console do Firebase.</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow mt-6">
+                <h3 class="text-lg font-semibold mb-1">🌙 Aparência</h3>
+                <p class="text-sm text-gray-600 mb-3">Vale só para este aparelho.</p>
+                <div class="grid grid-cols-3 gap-2 max-w-md" id="opcoesTema">
+                    <button onclick="definirTema('auto')" data-tema="auto" class="px-3 py-2 border rounded-md text-sm">⚙️ Automático</button>
+                    <button onclick="definirTema('claro')" data-tema="claro" class="px-3 py-2 border rounded-md text-sm">☀️ Claro</button>
+                    <button onclick="definirTema('escuro')" data-tema="escuro" class="px-3 py-2 border rounded-md text-sm">🌙 Escuro</button>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">Automático segue o celular/computador: escurece quando o aparelho está no modo escuro.</p>
             </div>
 
             <div class="bg-white p-6 rounded-lg shadow mt-6">
@@ -5074,6 +5162,47 @@
         }
 
         // =====================================================================
+        // TEMA CLARO / ESCURO (só neste aparelho)
+        // =====================================================================
+        function temaSalvo() {
+            try { return localStorage.getItem('pizzaria_tema') || 'auto'; } catch (e) { return 'auto'; }
+        }
+
+        function sistemaEscuro() { return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); }
+
+        function aplicarTema() {
+            const tema = temaSalvo();
+            const escuro = tema === 'escuro' || (tema === 'auto' && sistemaEscuro());
+            document.documentElement.classList.toggle('dark', escuro);
+            const meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', escuro ? '#0b1220' : '#ea580c');
+            const btn = document.getElementById('btnTema');
+            if (btn) { btn.textContent = escuro ? '☀️' : '🌙'; btn.title = escuro ? 'Mudar para modo claro' : 'Mudar para modo escuro'; }
+            document.querySelectorAll('#opcoesTema [data-tema]').forEach(b => {
+                const ativo = b.dataset.tema === tema;
+                b.classList.toggle('bg-orange-600', ativo);
+                b.classList.toggle('text-white', ativo);
+                b.classList.toggle('border-orange-600', ativo);
+            });
+        }
+
+        function definirTema(tema) {
+            try { localStorage.setItem('pizzaria_tema', tema); } catch (e) { }
+            aplicarTema();
+        }
+
+        // Botão do topo: troca direto entre claro e escuro
+        function alternarTema() {
+            definirTema(document.documentElement.classList.contains('dark') ? 'claro' : 'escuro');
+        }
+
+        if (window.matchMedia) {
+            const mq = window.matchMedia('(prefers-color-scheme: dark)');
+            const mudou = () => { if (temaSalvo() === 'auto') aplicarTema(); };
+            if (mq.addEventListener) mq.addEventListener('change', mudou); else if (mq.addListener) mq.addListener(mudou);
+        }
+
+        // =====================================================================
         // APP INSTALÁVEL (PWA)
         // =====================================================================
         let pedidoInstalacao = null;
@@ -5121,6 +5250,7 @@
         // =====================================================================
         document.addEventListener('DOMContentLoaded', function () {
             try {
+                aplicarTema();
                 carregarDados();
                 initSync();
                 showTab('dashboard');
