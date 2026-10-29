@@ -358,9 +358,39 @@
                 <div id="itensPedido" class="mb-4 p-4 bg-gray-50 rounded-lg" style="display: none;">
                     <h4 class="font-medium mb-3">Itens do Pedido:</h4>
                     <div id="listaItensPedido"></div>
+                    <div id="linhasDescontoPedido" class="border-t pt-3 mt-3 space-y-1 text-sm" style="display: none;">
+                        <div class="flex justify-between text-gray-600">
+                            <span>Subtotal:</span>
+                            <span id="subtotalPedido">R$ 0,00</span>
+                        </div>
+                        <div class="flex justify-between text-red-600">
+                            <span id="rotuloDescontoPedido">Desconto:</span>
+                            <span id="valorDescontoPedido">- R$ 0,00</span>
+                        </div>
+                    </div>
                     <div class="border-t pt-3 mt-3 flex justify-between text-lg font-bold">
                         <span>Total do Pedido:</span>
                         <span id="totalPedido" class="text-green-600">R$ 0,00</span>
+                    </div>
+                </div>
+
+                <div class="mb-4 max-w-md">
+                    <label class="flex items-center gap-2 text-sm font-medium mb-2 cursor-pointer select-none">
+                        <input type="checkbox" id="temDesconto" onchange="alternarDesconto()" class="w-4 h-4">
+                        🏷️ Houve desconto neste pedido?
+                    </label>
+                    <div id="camposDesconto" class="p-3 bg-gray-50 rounded-lg space-y-2" style="display: none;">
+                        <div class="flex gap-2">
+                            <input type="number" id="valorDesconto" step="0.01" min="0" placeholder="Valor do desconto" inputmode="decimal"
+                                   oninput="mudouDesconto()" class="flex-1 min-w-0 px-3 py-2 border rounded-md">
+                            <select id="tipoDesconto" onchange="mudouDesconto()" class="px-3 py-2 border rounded-md">
+                                <option value="R$">R$</option>
+                                <option value="%">%</option>
+                            </select>
+                        </div>
+                        <input type="text" id="motivoDesconto" placeholder="Motivo (ex: cliente fiel, pizza atrasou, cupom)"
+                               oninput="atualizarItensPedido()" class="w-full px-3 py-2 border rounded-md">
+                        <p id="resumoDesconto" class="text-sm text-gray-600"></p>
                     </div>
                 </div>
 
@@ -2441,7 +2471,7 @@
                     subtotal: preco * item.quantidade
                 };
             });
-            dados.pedidoAtual.total = dados.pedidoAtual.itens.reduce((t, i) => t + i.subtotal, 0);
+            recalcularTotalPedidoAtual();
             atualizarItensPedido();
             toast(mudouPreco ? 'Último pedido repetido com os preços atuais.' : 'Último pedido repetido!', 'sucesso');
         }
@@ -2472,7 +2502,9 @@
             const margem = receita > 0 ? (lucroLiquido / receita) * 100 : 0;
             const ticketMedio = pedidosPagos.length > 0 ? receita / pedidosPagos.length : 0;
 
-            return { receita, custo, saidas, lucroOperacional, lucroLiquido, margem, ticketMedio, totalPedidos: pedidosFiltrados.length };
+            const descontos = pedidosPagos.reduce((t, p) => t + (p.desconto || 0), 0);
+            const qtdDescontos = pedidosPagos.filter(p => p.desconto > 0).length;
+            return { receita, custo, saidas, lucroOperacional, lucroLiquido, margem, ticketMedio, totalPedidos: pedidosFiltrados.length, descontos, qtdDescontos };
         }
 
         function atualizarDashboard() {
@@ -2515,6 +2547,10 @@
                     <span>Receita Total (pedidos pagos):</span>
                     <span class="font-semibold text-green-600">${formatarMoeda(stats.receita)}</span>
                 </div>
+                ${stats.descontos > 0 ? `<div class="flex justify-between text-sm text-gray-500">
+                    <span>🏷️ Descontos dados (${stats.qtdDescontos} pedido${stats.qtdDescontos === 1 ? '' : 's'}, já descontados da receita):</span>
+                    <span>${formatarMoeda(stats.descontos)}</span>
+                </div>` : ''}
                 <div class="flex justify-between">
                     <span>Custo de Produção:</span>
                     <span class="font-semibold text-red-600">-${formatarMoeda(stats.custo)}</span>
@@ -2721,7 +2757,7 @@
                 custoUnitario: produto.custo,
                 subtotal: produto.preco * qtd
             });
-            dados.pedidoAtual.total = dados.pedidoAtual.itens.reduce((t, i) => t + i.subtotal, 0);
+            recalcularTotalPedidoAtual();
             atualizarItensPedido();
             input.value = '';
             // Pequeno "pulo" na barra de baixo para confirmar o toque
@@ -2733,6 +2769,67 @@
         function adicionarMeiaUnidade(produtoId) {
             adicionarItemPedido(produtoId, { value: '0.5' });
             if (!ehCelular()) toast('½ unidade adicionada ao pedido.', 'info');
+        }
+
+        // --- Desconto do pedido em andamento ---
+        function lerDescontoDoFormulario(subtotal) {
+            const ativo = document.getElementById('temDesconto').checked;
+            const valor = parseFloat(document.getElementById('valorDesconto').value);
+            const tipo = document.getElementById('tipoDesconto').value;
+            if (!ativo || !(valor > 0)) return { desconto: 0, percentual: null };
+            if (tipo === '%') {
+                const pct = Math.min(valor, 100);
+                return { desconto: arredMoeda(subtotal * pct / 100), percentual: pct };
+            }
+            return { desconto: arredMoeda(Math.min(valor, subtotal)), percentual: null };
+        }
+
+        function arredMoeda(v) { return Math.round((Number(v) || 0) * 100) / 100; }
+
+        // Subtotal (itens) - desconto = total. Use sempre esta função para mexer no total do pedido em andamento.
+        function recalcularTotalPedidoAtual() {
+            const pa = dados.pedidoAtual;
+            pa.subtotal = arredMoeda(pa.itens.reduce((t, i) => t + i.subtotal, 0));
+            const d = lerDescontoDoFormulario(pa.subtotal);
+            pa.desconto = d.desconto;
+            pa.total = arredMoeda(pa.subtotal - d.desconto);
+            return d;
+        }
+
+        function alternarDesconto() {
+            const ativo = document.getElementById('temDesconto').checked;
+            document.getElementById('camposDesconto').style.display = ativo ? 'block' : 'none';
+            if (ativo) setTimeout(() => document.getElementById('valorDesconto').focus(), 50);
+            mudouDesconto();
+        }
+
+        function mudouDesconto() {
+            const d = recalcularTotalPedidoAtual();
+            const pa = dados.pedidoAtual;
+            const resumo = document.getElementById('resumoDesconto');
+            const tipo = document.getElementById('tipoDesconto').value;
+            const digitado = parseFloat(document.getElementById('valorDesconto').value);
+            if (!document.getElementById('temDesconto').checked) resumo.textContent = '';
+            else if (!pa.itens.length) resumo.textContent = 'Adicione os itens para ver o desconto.';
+            else if (tipo === 'R$' && digitado > pa.subtotal) resumo.innerHTML = `<span class="text-yellow-700">⚠️ O desconto não pode passar do subtotal (${formatarMoeda(pa.subtotal)}).</span>`;
+            else if (d.desconto > 0) resumo.innerHTML = `Desconto de <strong>${formatarMoeda(d.desconto)}</strong>${d.percentual !== null ? ` (${formatarNumero(d.percentual)}%)` : ''} → cliente paga <strong class="text-green-700">${formatarMoeda(pa.total)}</strong>`;
+            else resumo.textContent = '';
+            atualizarItensPedido();
+        }
+
+        function limparDescontoFormulario() {
+            document.getElementById('temDesconto').checked = false;
+            document.getElementById('valorDesconto').value = '';
+            document.getElementById('tipoDesconto').value = 'R$';
+            document.getElementById('motivoDesconto').value = '';
+            document.getElementById('resumoDesconto').textContent = '';
+            document.getElementById('camposDesconto').style.display = 'none';
+        }
+
+        // Texto curto do desconto: "10%" ou "R$ 5,00"
+        function textoDesconto(p) {
+            if (!(p.desconto > 0)) return '';
+            return p.descontoPercentual != null ? `${formatarNumero(p.descontoPercentual)}% (${formatarMoeda(p.desconto)})` : formatarMoeda(p.desconto);
         }
 
         function atualizarItensPedido() {
@@ -2753,12 +2850,21 @@
                     </div>
                 </div>
             `).join('');
-            document.getElementById('totalPedido').textContent = formatarMoeda(dados.pedidoAtual.total);
+            const pa = dados.pedidoAtual;
+            const temDesc = pa.desconto > 0;
+            document.getElementById('linhasDescontoPedido').style.display = temDesc ? 'block' : 'none';
+            if (temDesc) {
+                const motivo = document.getElementById('motivoDesconto').value.trim();
+                document.getElementById('subtotalPedido').textContent = formatarMoeda(pa.subtotal);
+                document.getElementById('rotuloDescontoPedido').textContent = 'Desconto' + (motivo ? ` (${motivo})` : '') + ':';
+                document.getElementById('valorDescontoPedido').textContent = '- ' + formatarMoeda(pa.desconto);
+            }
+            document.getElementById('totalPedido').textContent = formatarMoeda(pa.total);
         }
 
         function removerItemPedido(index) {
             dados.pedidoAtual.itens.splice(index, 1);
-            dados.pedidoAtual.total = dados.pedidoAtual.itens.reduce((t, i) => t + i.subtotal, 0);
+            recalcularTotalPedidoAtual();
             atualizarItensPedido();
         }
 
@@ -2776,6 +2882,8 @@
                 clienteId = registrarClienteDoPedido(cliente, telefone, endereco, clienteSelecionadoId);
             }
 
+            const desc = recalcularTotalPedidoAtual();
+            const motivoDesconto = document.getElementById('motivoDesconto').value.trim();
             const itens = [...dados.pedidoAtual.itens];
             const consumo = aplicarConsumo(calcularConsumo(itens), -1);
 
@@ -2791,10 +2899,15 @@
                 formaPagamento,
                 criadoPor: usuarioNome(),
                 itens,
+                subtotal: dados.pedidoAtual.subtotal,
+                desconto: desc.desconto,
+                descontoPercentual: desc.desconto > 0 ? desc.percentual : null,
+                descontoMotivo: desc.desconto > 0 ? motivoDesconto : '',
                 total: dados.pedidoAtual.total,
                 consumo
             });
             dados.pedidoAtual = { itens: [], total: 0 };
+            limparDescontoFormulario();
 
             ['nomeCliente', 'telefoneCliente', 'enderecoCliente', 'observacoesPedido'].forEach(id => { document.getElementById(id).value = ''; });
             document.getElementById('formaPagamentoPedido').value = 'Devedor';
@@ -2885,6 +2998,7 @@
                     </td>
                     <td class="py-3 px-2 text-right font-semibold ${devedor ? 'text-yellow-600' : 'text-green-600'}">
                         <span class="pedido-total-${pedido.id}">${formatarMoeda(pedido.total)}</span>
+                        ${pedido.desconto > 0 ? `<div class="text-xs font-normal text-red-600" title="${esc(pedido.descontoMotivo || '')}">🏷️ -${esc(textoDesconto(pedido))}${pedido.descontoMotivo ? `<span class="block text-gray-500">${esc(pedido.descontoMotivo)}</span>` : ''}</div>` : ''}
                     </td>
                     <td class="py-3 px-2 text-center">
                         <div class="flex gap-1 justify-center">
@@ -3021,9 +3135,27 @@
                             <button onclick="adicionarItemModal()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">➕</button>
                         </div>
                     </div>
-                    <div class="flex justify-between items-center p-3 bg-green-50 rounded mb-4">
-                        <span class="font-bold">Total:</span>
-                        <span id="totalPedidoModal" class="font-bold text-green-600">${formatarMoeda(pedido.total)}</span>
+                    <div class="mb-4 p-3 bg-gray-50 rounded">
+                        <h4 class="font-medium mb-2">🏷️ Desconto:</h4>
+                        <div class="flex gap-2 mb-2">
+                            <input type="number" id="valorDescontoModal" step="0.01" min="0" placeholder="Sem desconto" inputmode="decimal"
+                                   value="${pedido.desconto > 0 ? (pedido.descontoPercentual != null ? pedido.descontoPercentual : pedido.desconto) : ''}"
+                                   oninput="atualizarTotalModal()" class="flex-1 min-w-0 px-3 py-2 border rounded">
+                            <select id="tipoDescontoModal" onchange="atualizarTotalModal()" class="px-3 py-2 border rounded">
+                                <option value="R$" ${pedido.descontoPercentual != null ? '' : 'selected'}>R$</option>
+                                <option value="%" ${pedido.descontoPercentual != null ? 'selected' : ''}>%</option>
+                            </select>
+                        </div>
+                        <input type="text" id="motivoDescontoModal" placeholder="Motivo do desconto" value="${esc(pedido.descontoMotivo || '')}"
+                               class="w-full px-3 py-2 border rounded">
+                    </div>
+                    <div class="p-3 bg-green-50 rounded mb-4 space-y-1">
+                        <div id="linhaSubtotalModal" class="flex justify-between text-sm text-gray-600"></div>
+                        <div id="linhaDescontoModal" class="flex justify-between text-sm text-red-600"></div>
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold">Total:</span>
+                            <span id="totalPedidoModal" class="font-bold text-green-600">${formatarMoeda(pedido.total)}</span>
+                        </div>
                     </div>
                     <div class="flex gap-2">
                         <button onclick="salvarItensPedido(${id})" class="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">💾 Salvar Alterações</button>
@@ -3033,6 +3165,7 @@
             `;
             document.body.appendChild(modal);
             ativarBuscaSelect('novoProdutoModal', { placeholder: '🔎 Buscar produto', focar: 'novaQuantidadeModal' });
+            atualizarTotalModal();
         }
 
         function atualizarQuantidadeItem(input, index) {
@@ -3078,9 +3211,25 @@
         }
 
         function atualizarTotalModal() {
-            const total = window.pedidoEditandoItens.itens.reduce((s, i) => s + i.subtotal, 0);
-            window.pedidoEditandoItens.total = total;
-            document.getElementById('totalPedidoModal').textContent = formatarMoeda(total);
+            const pe = window.pedidoEditandoItens;
+            if (!pe) return;
+            const subtotal = arredMoeda(pe.itens.reduce((s, i) => s + i.subtotal, 0));
+            const valor = parseFloat((document.getElementById('valorDescontoModal') || {}).value);
+            const tipo = (document.getElementById('tipoDescontoModal') || {}).value || 'R$';
+            let desconto = 0, percentual = null;
+            if (valor > 0) {
+                if (tipo === '%') { percentual = Math.min(valor, 100); desconto = arredMoeda(subtotal * percentual / 100); }
+                else desconto = arredMoeda(Math.min(valor, subtotal));
+            }
+            pe.subtotal = subtotal;
+            pe.desconto = desconto;
+            pe.descontoPercentual = desconto > 0 ? percentual : null;
+            pe.total = arredMoeda(subtotal - desconto);
+            const ls = document.getElementById('linhaSubtotalModal');
+            const ld = document.getElementById('linhaDescontoModal');
+            if (ls) ls.innerHTML = desconto > 0 ? `<span>Subtotal:</span><span>${formatarMoeda(subtotal)}</span>` : '';
+            if (ld) ld.innerHTML = desconto > 0 ? `<span>Desconto${percentual !== null ? ` (${formatarNumero(percentual)}%)` : ''}:</span><span>- ${formatarMoeda(desconto)}</span>` : '';
+            document.getElementById('totalPedidoModal').textContent = formatarMoeda(pe.total);
         }
 
         function salvarItensPedido(id) {
@@ -3089,8 +3238,14 @@
             if (real) {
                 // Devolve o que o pedido antigo tinha usado e dá baixa no novo
                 if (real.consumo) aplicarConsumo(real.consumo, +1);
-                real.itens = window.pedidoEditandoItens.itens;
-                real.total = window.pedidoEditandoItens.total;
+                atualizarTotalModal();
+                const pe = window.pedidoEditandoItens;
+                real.itens = pe.itens;
+                real.subtotal = pe.subtotal;
+                real.desconto = pe.desconto;
+                real.descontoPercentual = pe.descontoPercentual;
+                real.descontoMotivo = pe.desconto > 0 ? document.getElementById('motivoDescontoModal').value.trim() : '';
+                real.total = pe.total;
                 real.consumo = aplicarConsumo(calcularConsumo(real.itens), -1);
             }
             salvarDados();
@@ -5003,6 +5158,7 @@
                         Data: dataBR(p.data), Hora: p.hora || '', Cliente: p.cliente || '', Telefone: p.telefone || '',
                         Endereço: p.endereco || '', Pagamento: p.formaPagamento || '',
                         Itens: (p.itens || []).map(i => `${i.nome} (${formatarQuantidade(i.quantidade)})`).join(', '),
+                        Subtotal: n2(p.subtotal ?? p.total), Desconto: n2(p.desconto || 0), 'Motivo do desconto': p.descontoMotivo || '',
                         Total: n2(p.total), Observações: p.observacoes || '', 'Lançado por': p.criadoPor || ''
                     })),
                     'Itens dos pedidos': pedidos.flatMap(p => (p.itens || []).map(i => ({
