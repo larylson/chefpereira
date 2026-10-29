@@ -1,7 +1,7 @@
 // Service worker do Chef Pereira: deixa o app abrir mesmo sem internet.
 // Os dados (pedidos, clientes...) ficam guardados pelo próprio Firebase; aqui guardamos só "o app".
-const VERSAO = 'chef-pereira-v1';
-const ARQUIVOS_DO_APP = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+const VERSAO = 'chef-pereira-v2';
+const ARQUIVOS_DO_APP = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './icon-maskable-512.png', './favicon.png'];
 const BIBLIOTECAS = [
     'https://cdn.tailwindcss.com',
     'https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-app-compat.min.js',
