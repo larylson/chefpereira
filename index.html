@@ -479,7 +479,10 @@
 
             <div class="bg-white p-6 rounded-lg shadow">
                 <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
-                    <h3 class="text-lg font-semibold">Clientes (<span id="qtdClientes">0</span>)</h3>
+                    <h3 class="text-lg font-semibold flex items-center gap-2"><span>Clientes (<span id="qtdClientes">0</span>)</span>
+                        <button onclick="corrigirNomesClientes()" class="text-xs font-medium px-2 py-1 border rounded-md hover:bg-gray-100 text-gray-600"
+                                title="Corrigir maiúsculas dos nomes: joão da silva → João da Silva">Aa Corrigir nomes</button>
+                    </h3>
                     <div class="flex gap-2 flex-wrap">
                         <input type="text" id="buscaCliente" placeholder="🔎 Buscar nome ou telefone" oninput="atualizarClientes()" class="px-3 py-2 border rounded-md text-sm">
                         <select id="filtroCliente" onchange="atualizarClientes()" class="px-3 py-2 border rounded-md text-sm">
@@ -2628,8 +2631,72 @@
             return est.qtd >= 3 && est.diasSemPedir !== null && est.diasSemPedir > DIAS_CLIENTE_SUMIDO;
         }
 
+        // "JOÃO DA SILVA" / "joão da silva" -> "João da Silva"
+        const PARTICULAS_NOME = ['da', 'das', 'de', 'do', 'dos', 'e', 'di', 'du'];
+        function nomeProprio(texto) {
+            const limpo = String(texto || '').replace(/\s+/g, ' ').trim();
+            if (!limpo) return limpo;
+            return limpo.toLocaleLowerCase('pt-BR').split(' ').map((palavra, i) => {
+                if (i > 0 && PARTICULAS_NOME.includes(palavra)) return palavra;
+                // Maiúscula no começo e depois de hífen, apóstrofo ou parêntese: Ana-Maria, D'Ávila, (Bar)
+                return palavra.replace(/(^|[-'’(])(\p{L})/gu, (m, antes, letra) => antes + letra.toLocaleUpperCase('pt-BR'));
+            }).join(' ');
+        }
+
+        async function corrigirNomesClientes() {
+            const mudancas = [];
+            dados.clientes.forEach(c => {
+                const novo = nomeProprio(c.nome);
+                if (novo && novo !== c.nome) mudancas.push({ antes: c.nome, depois: novo });
+            });
+            const pedidosMudam = dados.pedidos.filter(p => p.cliente && nomeProprio(p.cliente) !== p.cliente);
+            // Nomes que só existem nos pedidos (cliente sem cadastro) também entram na lista
+            const jaListados = new Set(mudancas.map(m => m.antes));
+            pedidosMudam.forEach(p => {
+                if (jaListados.has(p.cliente)) return;
+                jaListados.add(p.cliente);
+                mudancas.push({ antes: p.cliente, depois: nomeProprio(p.cliente), soPedido: true });
+            });
+            if (!mudancas.length) { toast('Todos os nomes já estão certinhos! ✅', 'sucesso'); return; }
+
+            const m = document.createElement('div');
+            m.id = 'modalNomes';
+            m.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            const mostrar = mudancas.slice(0, 40);
+            m.innerHTML = `
+                <div class="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4 confirm-pop">
+                    <h3 class="text-lg font-semibold mb-1">Aa Corrigir nomes</h3>
+                    <p class="text-sm text-gray-600 mb-3">${mudancas.length} nome(s) vão ficar assim${pedidosMudam.length ? ` (também em ${pedidosMudam.length} pedido(s))` : ''}:</p>
+                    <div class="max-h-72 overflow-y-auto space-y-1 mb-4 text-sm">
+                        ${mostrar.map(x => `
+                            <div class="flex items-center gap-2 p-2 bg-gray-50 rounded">
+                                <span class="flex-1 min-w-0 truncate text-gray-500 line-through">${esc(x.antes)}</span>
+                                <span>→</span>
+                                <span class="flex-1 min-w-0 truncate font-medium">${esc(x.depois)}</span>
+                            </div>`).join('')}
+                        ${mudancas.length > mostrar.length ? `<p class="text-xs text-gray-500 text-center">e mais ${mudancas.length - mostrar.length}...</p>` : ''}
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="btnAplicarNomes" class="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">✔ Corrigir tudo</button>
+                        <button onclick="fecharModal('modalNomes')" class="flex-1 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">✖ Cancelar</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(m);
+            m.querySelector('#btnAplicarNomes').onclick = () => {
+                let nCli = 0;
+                dados.clientes.forEach(c => { const n = nomeProprio(c.nome); if (n && n !== c.nome) { c.nome = n; nCli++; } });
+                pedidosMudam.forEach(p => { p.cliente = nomeProprio(p.cliente); });
+                salvarDados();
+                fecharModal('modalNomes');
+                atualizarClientes();
+                atualizarDatalistClientes();
+                if (abaAtiva() === 'pedidos') atualizarListaPedidos();
+                toast(`Nomes corrigidos: ${nCli} cliente(s) e ${pedidosMudam.length} pedido(s).`, 'sucesso');
+            };
+        }
+
         function adicionarCliente() {
-            const nome = document.getElementById('nomeNovoCliente').value.trim();
+            const nome = nomeProprio(document.getElementById('nomeNovoCliente').value);
             const telefone = document.getElementById('telefoneNovoCliente').value.trim();
             const endereco = document.getElementById('enderecoNovoCliente').value.trim();
             const observacoes = document.getElementById('obsNovoCliente').value.trim();
@@ -2655,7 +2722,7 @@
                 if (endereco) cli.endereco = endereco;
                 return cli.id;
             }
-            const novo = { id: Date.now() + 1, nome, telefone, endereco, observacoes: '', criadoEm: hojeLocal(), criadoPor: usuarioNome() };
+            const novo = { id: Date.now() + 1, nome: nomeProprio(nome), telefone, endereco, observacoes: '', criadoEm: hojeLocal(), criadoPor: usuarioNome() };
             dados.clientes.push(novo);
             return novo.id;
         }
@@ -2666,7 +2733,7 @@
                 if (!p.cliente) return;
                 const tel = normTel(p.telefone);
                 const chave = tel.length >= 8 ? 't' + tel : 'n' + p.cliente.trim().toLowerCase();
-                grupos[chave] = { nome: p.cliente.trim(), telefone: p.telefone || '', endereco: p.endereco || grupos[chave]?.endereco || '' };
+                grupos[chave] = { nome: nomeProprio(p.cliente), telefone: p.telefone || '', endereco: p.endereco || grupos[chave]?.endereco || '' };
             });
             const novos = Object.values(grupos).filter(g => {
                 if (normTel(g.telefone).length >= 8) return !buscarClientePorTelefone(g.telefone);
@@ -2745,7 +2812,7 @@
         function salvarCliente(id) {
             const c = dados.clientes.find(x => x.id === id);
             if (!c) return;
-            const nome = document.getElementById('editCliNome').value.trim();
+            const nome = nomeProprio(document.getElementById('editCliNome').value);
             const telefone = document.getElementById('editCliTel').value.trim();
             if (!nome) { toast('O nome não pode ficar vazio!', 'aviso'); return; }
             const outro = telefone ? buscarClientePorTelefone(telefone) : null;
@@ -3253,7 +3320,7 @@
         }
 
         function finalizarPedido() {
-            const cliente = document.getElementById('nomeCliente').value.trim();
+            const cliente = nomeProprio(document.getElementById('nomeCliente').value);
             if (!cliente) { toast('Digite o nome do cliente!', 'aviso'); return; }
             if (dados.pedidoAtual.itens.length === 0) { toast('Adicione pelo menos um item ao pedido!', 'aviso'); return; }
 
