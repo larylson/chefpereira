@@ -49,6 +49,12 @@
         th.th-ordenavel:hover { background: #f3f4f6; }
         th .seta-ordem { font-size: .7rem; margin-left: 2px; }
         .chip-cat { transition: background-color .15s ease, color .15s ease; }
+        .sub-aba-ped { transition: background-color .15s ease, color .15s ease; }
+        .sub-oculto { display: none !important; }
+        #subBtnNovo.bg-orange-600 #badgeNovo, #subBtnLista.bg-orange-600 #badgeLista { background: #fff !important; color: #c2410c !important; }
+        #subBtnLista.bg-orange-600 #badgeDevedores { background: #fee2e2 !important; color: #b91c1c !important; }
+        @keyframes pulsoBadge { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
+        .pulso { animation: pulsoBadge .45s ease; }
 
         /* ---------- Toque mais rápido e fluido ---------- */
         html { -webkit-tap-highlight-color: transparent; scroll-behavior: smooth; }
@@ -338,7 +344,18 @@
 
         <!-- ===================== PEDIDOS ===================== -->
         <div id="pedidos" class="tab-content">
-            <div class="bg-white p-6 rounded-lg shadow mb-6">
+            <!-- Seletor: novo pedido / pedidos do período -->
+            <div class="grid grid-cols-2 gap-1 p-1 mb-4 bg-white rounded-lg shadow" role="tablist">
+                <button id="subBtnNovo" onclick="mostrarSubPedidos('novo')" class="sub-aba-ped py-2.5 px-2 rounded-md font-medium text-sm md:text-base">
+                    ➕ Novo<span class="hidden md:inline"> pedido</span> <span id="badgeNovo" class="ml-1 whitespace-nowrap text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700" style="display: none;"></span>
+                </button>
+                <button id="subBtnLista" onclick="mostrarSubPedidos('lista')" class="sub-aba-ped py-2.5 px-2 rounded-md font-medium text-sm md:text-base">
+                    📋 Pedidos<span class="hidden md:inline"> do período</span> <span id="badgeLista" class="ml-1 whitespace-nowrap text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">0</span>
+                    <span id="badgeDevedores" class="whitespace-nowrap text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700" style="display: none;" title="Pedidos devedores no período"></span>
+                </button>
+            </div>
+
+            <div id="subNovoPedido" class="bg-white p-6 rounded-lg shadow mb-6">
                 <h3 class="text-lg font-semibold mb-4">Novo Pedido</h3>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4">
                     <input type="text" id="nomeCliente" placeholder="Nome do cliente *" list="datalistClientes" autocomplete="off"
@@ -416,7 +433,7 @@
                 </button>
             </div>
 
-            <div class="bg-white p-6 rounded-lg shadow">
+            <div id="subListaPedidos" class="bg-white p-6 rounded-lg shadow">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-semibold">Pedidos do Período</h3>
                     <select id="filtroPagamento" onchange="atualizarListaPedidos()" class="px-3 py-2 border rounded-md text-sm">
@@ -1840,11 +1857,63 @@
             requestAnimationFrame(() => { agendadoMobile = false; prepararTabelasMobile(); });
         }
 
+        // --- Aba Pedidos dividida em "Novo pedido" e "Pedidos do período" (lembra a escolha neste aparelho) ---
+        let subPedidos = 'novo';
+        try { subPedidos = localStorage.getItem('pizzaria_sub_pedidos') === 'lista' ? 'lista' : 'novo'; } catch (e) { }
+
+        function mostrarSubPedidos(qual, semRolar) {
+            subPedidos = qual === 'lista' ? 'lista' : 'novo';
+            try { localStorage.setItem('pizzaria_sub_pedidos', subPedidos); } catch (e) { }
+            document.getElementById('subNovoPedido').classList.toggle('sub-oculto', subPedidos !== 'novo');
+            document.getElementById('subListaPedidos').classList.toggle('sub-oculto', subPedidos !== 'lista');
+            [['subBtnNovo', 'novo'], ['subBtnLista', 'lista']].forEach(([id, q]) => {
+                const b = document.getElementById(id);
+                const ativo = q === subPedidos;
+                b.classList.toggle('bg-orange-600', ativo);
+                b.classList.toggle('text-white', ativo);
+                b.classList.toggle('text-gray-700', !ativo);
+                b.classList.toggle('hover:bg-gray-100', !ativo);
+                b.setAttribute('aria-selected', ativo ? 'true' : 'false');
+            });
+            atualizarBarraPedido();
+            if (!semRolar && abaAtiva() === 'pedidos') {
+                const alvo = document.getElementById('pedidos');
+                const nav = document.querySelector('nav');
+                const topo = alvo.getBoundingClientRect().top + window.scrollY - (nav ? nav.offsetHeight + 8 : 0);
+                if (window.scrollY > topo) window.scrollTo({ top: topo, behavior: 'smooth' });
+            }
+        }
+
+        function atualizarBadgesPedidos() {
+            const itens = dados.pedidoAtual.itens;
+            const bNovo = document.getElementById('badgeNovo');
+            if (bNovo) {
+                const qtd = itens.reduce((t, i) => t + i.quantidade, 0);
+                bNovo.style.display = itens.length ? '' : 'none';
+                bNovo.textContent = itens.length ? `🛒 ${formatarQuantidade(qtd)}` : '';
+                bNovo.title = itens.length ? `${formatarQuantidade(qtd)} ${qtd === 1 ? 'item' : 'itens'} no pedido em andamento` : '';
+            }
+            const doPeriodo = filtrarPorPeriodo(dados.pedidos);
+            const bLista = document.getElementById('badgeLista');
+            if (bLista) {
+                const novo = String(doPeriodo.length);
+                if (bLista.textContent !== novo && bLista.textContent !== '') { bLista.classList.remove('pulso'); void bLista.offsetWidth; bLista.classList.add('pulso'); }
+                bLista.textContent = novo;
+            }
+            const bDev = document.getElementById('badgeDevedores');
+            if (bDev) {
+                const dev = doPeriodo.filter(p => p.formaPagamento === 'Devedor').length;
+                bDev.style.display = dev ? '' : 'none';
+                bDev.textContent = dev ? `🔴 ${dev}` : '';
+            }
+        }
+
         function atualizarBarraPedido() {
             const barra = document.getElementById('barraPedido');
             if (!barra) return;
             const itens = dados.pedidoAtual.itens;
-            const mostrar = itens.length > 0 && abaAtiva() === 'pedidos';
+            atualizarBadgesPedidos();
+            const mostrar = itens.length > 0 && abaAtiva() === 'pedidos' && subPedidos === 'novo';
             barra.classList.toggle('visivel', mostrar);
             document.body.classList.toggle('com-barra', mostrar && ehCelular());
             if (mostrar) {
@@ -2481,6 +2550,7 @@
             const cli = dados.clientes.find(c => c.id === id);
             if (!cli) return;
             showTab('pedidos');
+            mostrarSubPedidos('novo', true);
             aplicarClienteNoFormulario(cli, true);
             document.getElementById('nomeCliente').scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
@@ -2918,14 +2988,16 @@
             atualizarItensPedido();
 
             salvarDados();
-            if (formaPagamento === 'Devedor') toast('Pedido registrado como Devedor — não entra na receita até ser pago.', 'aviso');
-            else toast('Pedido finalizado com sucesso!', 'sucesso');
+            if (formaPagamento === 'Devedor') toast('Pedido registrado como Devedor — está em 📋 Pedidos do período.', 'aviso');
+            else toast('Pedido finalizado! Está em 📋 Pedidos do período.', 'sucesso');
             avisarEstoqueBaixo(consumo);
             atualizarDatalistClientes();
             atualizarListaPedidos();
+            mostrarSubPedidos('novo'); // volta ao topo, pronto para o próximo pedido
         }
 
         function atualizarPedidos() {
+            mostrarSubPedidos(subPedidos, true);
             atualizarProdutosPorCategoria();
             atualizarItensPedido();
             atualizarDatalistClientes();
@@ -2943,6 +3015,7 @@
         }
 
         function atualizarListaPedidos() {
+            atualizarBadgesPedidos();
             let pedidos = filtrarPorPeriodo(dados.pedidos);
             const filtro = document.getElementById('filtroPagamento').value;
             if (filtro === 'pagos') pedidos = pedidos.filter(p => p.formaPagamento !== 'Devedor');
