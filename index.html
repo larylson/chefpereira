@@ -52,6 +52,8 @@
         .sub-aba-ped { transition: background-color .15s ease, color .15s ease; }
         .sub-oculto { display: none !important; }
         #subBtnNovo.bg-orange-600 #badgeNovo, #subBtnLista.bg-orange-600 #badgeLista { background: #fff !important; color: #c2410c !important; }
+        #subBtnIngredientes.bg-orange-600 #badgeIngredientes, #subBtnReceitas.bg-orange-600 #badgeReceitas { background: #fff !important; color: #c2410c !important; }
+        #subBtnReceitas.bg-orange-600 #badgeReceitasPendentes { background: #fef9c3 !important; color: #854d0e !important; }
         #subBtnLista.bg-orange-600 #badgeDevedores { background: #fee2e2 !important; color: #b91c1c !important; }
         @keyframes pulsoBadge { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
         .pulso { animation: pulsoBadge .45s ease; }
@@ -591,7 +593,18 @@
 
         <!-- ===================== PRECIFICAÇÃO ===================== -->
         <div id="precificacao" class="tab-content">
-            <div class="bg-white p-6 rounded-lg shadow mb-6">
+            <!-- Seletor: ingredientes / receitas -->
+            <div class="grid grid-cols-2 gap-1 p-1 mb-4 bg-white rounded-lg shadow" role="tablist">
+                <button id="subBtnIngredientes" onclick="mostrarSubPrec('ingredientes')" class="sub-aba-ped py-2.5 px-2 rounded-md font-medium text-sm md:text-base">
+                    🧂 Ingredientes <span id="badgeIngredientes" class="ml-1 whitespace-nowrap text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">0</span>
+                </button>
+                <button id="subBtnReceitas" onclick="mostrarSubPrec('receitas')" class="sub-aba-ped py-2.5 px-2 rounded-md font-medium text-sm md:text-base">
+                    🍕 Receitas <span id="badgeReceitas" class="ml-1 whitespace-nowrap text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">0</span>
+                    <span id="badgeReceitasPendentes" class="whitespace-nowrap text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800" style="display: none;" title="Receitas sem ingredientes"></span>
+                </button>
+            </div>
+
+            <div id="subIngredientes" class="bg-white p-6 rounded-lg shadow mb-6">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-semibold">Ingredientes Base</h3>
                     <button onclick="atualizacaoRapidaPrecos()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm">
@@ -632,7 +645,7 @@
                 </div>
             </div>
 
-            <div class="bg-white p-6 rounded-lg shadow mb-6">
+            <div id="subReceitas" class="bg-white p-6 rounded-lg shadow mb-6">
                 <h3 class="text-lg font-semibold mb-4">Nova Receita/Produto</h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <input type="text" id="nomeReceita" placeholder="Nome do produto" class="px-3 py-2 border rounded-md" onkeypress="if(event.key==='Enter') criarReceita()">
@@ -4263,6 +4276,7 @@
         }
 
         function atualizarListaIngredientes() {
+            atualizarBadgesPrec();
             document.getElementById('listaIngredientes').innerHTML = dados.ingredientes.map(ing => `
                 <tr class="border-b hover:bg-gray-50" id="ingrediente-${ing.id}" draggable="true">
                     <td class="py-3 px-2">
@@ -4580,6 +4594,7 @@
         }
 
         function atualizarListaReceitas() {
+            atualizarBadgesPrec();
             if (dados.receitas.length === 0) {
                 atualizarControlesReceitas(0);
                 document.getElementById('listaReceitas').innerHTML = '<p class="text-gray-500 text-center py-4">Nenhuma receita cadastrada</p>';
@@ -4660,6 +4675,7 @@
             if (!receita) return;
 
             dados.receitaAtual = receita;
+            mostrarSubPrec('receitas', true);
             document.getElementById('nomeReceitaAtual').textContent = receita.nome;
             document.getElementById('editorReceita').style.display = 'block';
             document.getElementById('margemLucroReceita').value = receita.margem || 60;
@@ -4763,6 +4779,7 @@
         function atualizarIngredientesReceita() {
             const receita = dados.receitaAtual;
             if (!receita) return;
+            atualizarBadgesPrec();
 
             const custoTotal = receita.ingredientes.reduce((t, i) => t + i.custoTotal, 0);
             receita.custoTotal = custoTotal;
@@ -4916,11 +4933,54 @@
         }
 
         function atualizarPrecificacao() {
+            mostrarSubPrec(subPrec, true);
+            atualizarBadgesPrec();
             atualizarCategoriaReceita();
             atualizarListaIngredientes();
             atualizarListaReceitas();
             atualizarSelectIngredientes();
             inicializarDragDrop();
+        }
+
+        // --- Precificação dividida em "Ingredientes" e "Receitas" (lembra a escolha neste aparelho) ---
+        let subPrec = 'receitas';
+        try { subPrec = localStorage.getItem('pizzaria_sub_prec') === 'ingredientes' ? 'ingredientes' : 'receitas'; } catch (e) { }
+
+        function mostrarSubPrec(qual, semRolar) {
+            subPrec = qual === 'ingredientes' ? 'ingredientes' : 'receitas';
+            try { localStorage.setItem('pizzaria_sub_prec', subPrec); } catch (e) { }
+            document.getElementById('subIngredientes').classList.toggle('sub-oculto', subPrec !== 'ingredientes');
+            document.getElementById('subReceitas').classList.toggle('sub-oculto', subPrec !== 'receitas');
+            document.getElementById('editorReceita').classList.toggle('sub-oculto', subPrec !== 'receitas');
+            [['subBtnIngredientes', 'ingredientes'], ['subBtnReceitas', 'receitas']].forEach(([id, q]) => {
+                const b = document.getElementById(id);
+                const ativo = q === subPrec;
+                b.classList.toggle('bg-orange-600', ativo);
+                b.classList.toggle('text-white', ativo);
+                b.classList.toggle('text-gray-700', !ativo);
+                b.classList.toggle('hover:bg-gray-100', !ativo);
+                b.setAttribute('aria-selected', ativo ? 'true' : 'false');
+            });
+            if (!semRolar && abaAtiva() === 'precificacao') {
+                const alvo = document.getElementById('precificacao');
+                const nav = document.querySelector('nav');
+                const topo = alvo.getBoundingClientRect().top + window.scrollY - (nav ? nav.offsetHeight + 8 : 0);
+                if (window.scrollY > topo) window.scrollTo({ top: topo, behavior: 'smooth' });
+            }
+        }
+
+        function atualizarBadgesPrec() {
+            const bi = document.getElementById('badgeIngredientes');
+            if (bi) bi.textContent = dados.ingredientes.length;
+            const br = document.getElementById('badgeReceitas');
+            if (br) br.textContent = dados.receitas.length;
+            const bp = document.getElementById('badgeReceitasPendentes');
+            if (bp) {
+                const n = dados.receitas.filter(r => !r.ingredientes.length).length;
+                bp.style.display = n ? '' : 'none';
+                bp.textContent = n ? `⏳ ${n}` : '';
+                bp.title = n ? `${n} receita(s) ainda sem ingredientes` : '';
+            }
         }
 
         function preencherSelectCategorias(id, lista) {
@@ -5127,6 +5187,7 @@
 
         function irParaReceitasSemIngredientes() {
             showTab('precificacao');
+            mostrarSubPrec('receitas', true);
             const filtro = document.getElementById('filtroMostrarReceita');
             if (filtro) { filtro.value = 'semIngredientes'; atualizarListaReceitas(); }
             const lista = document.getElementById('listaReceitas');
