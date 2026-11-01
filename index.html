@@ -2261,16 +2261,26 @@
         }
 
         // Quanto de cada ingrediente os itens de um pedido usam (pelas receitas)
+        // Soma quanto de cada ingrediente "unidades" de uma receita usam — entrando nas receitas base (ex.: bandeja = 25 × empada)
+        function somarConsumoReceita(receita, unidades, acc, profundidade = 0) {
+            if (!receita || profundidade > 8) return acc;
+            const rend = rendimentoDe(receita);
+            receita.ingredientes.forEach(ri => {
+                if (!(ri.quantidade > 0)) return;
+                const qtd = ri.quantidade / rend * unidades;
+                if (ri.tipo === 'receita') somarConsumoReceita(dados.receitas.find(x => x.id === ri.receitaId), qtd, acc, profundidade + 1);
+                else acc[ri.ingredienteId] = (acc[ri.ingredienteId] || 0) + qtd;
+            });
+            return acc;
+        }
+
         function calcularConsumo(itens) {
             const consumo = {};
             (itens || []).forEach(item => {
                 const produto = dados.produtos.find(p => p.id == item.produtoId);
                 const receita = produto ? receitaDoProduto(produto) : dados.receitas.find(r => r.nome === item.nome);
                 if (!receita) return;
-                receita.ingredientes.forEach(ri => {
-                    if (!(ri.quantidade > 0)) return;
-                    consumo[ri.ingredienteId] = (consumo[ri.ingredienteId] || 0) + ri.quantidade / rendimentoDe(receita) * item.quantidade;
-                });
+                somarConsumoReceita(receita, item.quantidade, consumo);
             });
             return consumo;
         }
@@ -2335,10 +2345,10 @@
                 if (!receita || !receita.ingredientes.length) return;
                 let unidades = Infinity;
                 let limitante = null;
-                receita.ingredientes.forEach(ri => {
-                    const ing = dados.ingredientes.find(i => i.id == ri.ingredienteId);
-                    if (!controlado(ing) || !(ri.quantidade > 0)) return;
-                    const u = Math.floor(Math.max(0, ing.estoque) / (ri.quantidade / rendimentoDe(receita)) + 1e-9);
+                Object.entries(somarConsumoReceita(receita, 1, {})).forEach(([id, porUnidade]) => {
+                    const ing = dados.ingredientes.find(i => i.id == id);
+                    if (!controlado(ing) || !(porUnidade > 0)) return;
+                    const u = Math.floor(Math.max(0, ing.estoque) / porUnidade + 1e-9);
                     if (u < unidades) { unidades = u; limitante = ing.nome; }
                 });
                 if (unidades !== Infinity) resultado.push({ produto, unidades, limitante });
@@ -4399,24 +4409,53 @@
         function atualizarReceitasComIngrediente(ingredienteId) {
             const ing = dados.ingredientes.find(i => i.id === ingredienteId);
             if (!ing) return;
-            let afetadas = 0;
-
-            dados.receitas.forEach(receita => {
-                receita.ingredientes.forEach(ir => {
-                    if (ir.ingredienteId === ingredienteId) {
-                        recalcularItemReceita(ir, ing);
-                        afetadas++;
-                    }
-                });
-                receita.custoLote = receita.ingredientes.reduce((t, i) => t + i.custoTotal, 0);
-                receita.custoTotal = receita.custoLote / rendimentoDe(receita);
-            });
-
-            if (afetadas > 0) {
+            if (recalcularCustosReceitas()) {
                 salvarDados();
                 atualizarListaReceitas();
                 if (dados.receitaAtual) atualizarIngredientesReceita();
             }
+        }
+
+        // Recalcula o custo de todas as receitas, inclusive as que usam outras receitas como base.
+        // Retorna true se algo mudou.
+        function recalcularCustosReceitas() {
+            let algoMudou = false;
+            for (let passo = 0; passo < 8; passo++) {
+                let mudou = false;
+                dados.receitas.forEach(r => {
+                    r.ingredientes.forEach(ir => {
+                        const antes = ir.custoTotal;
+                        if (ir.tipo === 'receita') {
+                            const sub = dados.receitas.find(x => x.id === ir.receitaId);
+                            if (sub) { ir.nome = sub.nome; ir.custoUnitario = sub.custoTotal || 0; }
+                            ir.custoTotal = (ir.custoUnitario || 0) * ir.quantidade;
+                        } else {
+                            const ingCad = dados.ingredientes.find(i => i.id === ir.ingredienteId);
+                            if (ingCad) recalcularItemReceita(ir, ingCad);
+                        }
+                        if (Math.abs((antes || 0) - (ir.custoTotal || 0)) > 1e-12) mudou = true;
+                    });
+                    const lote = r.ingredientes.reduce((t, i) => t + (i.custoTotal || 0), 0);
+                    const unidade = lote / rendimentoDe(r);
+                    if (Math.abs((r.custoTotal || 0) - unidade) > 1e-12) mudou = true;
+                    r.custoLote = lote;
+                    r.custoTotal = unidade;
+                });
+                if (!mudou) break;
+                algoMudou = true;
+            }
+            return algoMudou;
+        }
+
+        // A receita "r" usa (direta ou indiretamente) a receita "alvoId"? Evita receita dentro dela mesma.
+        function receitaContem(r, alvoId, profundidade = 0) {
+            if (!r || profundidade > 8) return false;
+            return r.ingredientes.some(ir => ir.tipo === 'receita' &&
+                (ir.receitaId === alvoId || receitaContem(dados.receitas.find(x => x.id === ir.receitaId), alvoId, profundidade + 1)));
+        }
+
+        function receitasQueUsam(id) {
+            return dados.receitas.filter(r => r.ingredientes.some(ir => ir.tipo === 'receita' && ir.receitaId === id));
         }
 
         function atualizacaoRapidaPrecos() {
@@ -4654,6 +4693,7 @@
                                     <td class="py-3 px-2 font-medium">
                                         <span class="receita-nome-${r.id}">${esc(r.nome)}</span>
                                         ${rendimentoDe(r) > 1 ? `<span class="ml-1 inline-block text-xs font-normal px-2 py-0.5 rounded bg-blue-100 text-blue-800" title="Custo mostrado é por unidade">🍽️ rende ${formatarNumero(rendimentoDe(r))}</span>` : ''}
+                                        ${receitasQueUsam(r.id).length ? `<span class="ml-1 inline-block text-xs font-normal px-2 py-0.5 rounded bg-purple-100 text-purple-800" title="Usada em: ${esc(receitasQueUsam(r.id).map(x => x.nome).join(', '))}">🧩 base de ${receitasQueUsam(r.id).length}</span>` : ''}
                                         ${r.ingredientes.length === 0 ? '<span class="ml-1 inline-block text-xs font-normal px-2 py-0.5 rounded bg-yellow-100 text-yellow-800">falta ingredientes</span>' : ''}
                                         <input type="text" class="receita-nome-edit-${r.id} px-2 py-1 border rounded w-full"
                                                value="${esc(r.nome)}" onkeypress="if(event.key==='Enter') salvarInfoReceita(${r.id})" style="display: none;">
@@ -4717,8 +4757,14 @@
         }
 
         function preencherUnidadesIngredienteReceita() {
-            const ing = dados.ingredientes.find(i => i.id == document.getElementById('ingredienteReceita').value);
+            const valor = document.getElementById('ingredienteReceita').value;
             const sel = document.getElementById('unidadeIngredienteReceita');
+            if (String(valor).startsWith('r:')) {
+                sel.innerHTML = '<option value="un">unidade(s)</option>';
+                atualizarPreviaIngredienteReceita();
+                return;
+            }
+            const ing = dados.ingredientes.find(i => i.id == valor);
             const atual = sel.value;
             if (!ing) { sel.innerHTML = '<option value="">unidade</option>'; atualizarPreviaIngredienteReceita(); return; }
             const opcoes = opcoesUnidade(ing);
@@ -4730,9 +4776,19 @@
         function atualizarPreviaIngredienteReceita() {
             const prev = document.getElementById('previaIngredienteReceita');
             if (!prev) return;
-            const ing = dados.ingredientes.find(i => i.id == document.getElementById('ingredienteReceita').value);
+            const valor = document.getElementById('ingredienteReceita').value;
             const qtd = parseFloat(document.getElementById('quantidadeIngredienteReceita').value);
             const un = document.getElementById('unidadeIngredienteReceita').value;
+            if (String(valor).startsWith('r:')) {
+                const base = dados.receitas.find(r => 'r:' + r.id === valor);
+                if (!base) { prev.style.display = 'none'; return; }
+                prev.innerHTML = qtd > 0
+                    ? `= ${formatarNumero(qtd)} × ${esc(base.nome)} · custo ${formatarMoeda(qtd * (base.custoTotal || 0))}`
+                    : `Receita base: ${formatarMoeda(base.custoTotal || 0)} por unidade${rendimentoDe(base) > 1 ? ` (lote rende ${formatarNumero(rendimentoDe(base))})` : ''}. Diga quantas unidades vão aqui.`;
+                prev.style.display = 'block';
+                return;
+            }
+            const ing = dados.ingredientes.find(i => i.id == valor);
             if (!ing) { prev.style.display = 'none'; return; }
             const temMedidas = medidasDe(ing).length > 0;
             let txt;
@@ -4751,8 +4807,15 @@
             const select = document.getElementById('ingredienteReceita');
             if (!select) return;
             const atual = select.value;
-            select.innerHTML = '<option value="">Selecionar ingrediente</option>' +
-                dados.ingredientes.map(ing => `<option value="${ing.id}">${esc(ing.nome)} (${formatarMoeda(ing.precoUnidade)}/${ing.unidade})</option>`).join('');
+            const atualId = dados.receitaAtual ? dados.receitaAtual.id : null;
+            const bases = dados.receitas.filter(r => r.id !== atualId && !(atualId && receitaContem(r, atualId)));
+            select.innerHTML = '<option value="">Selecionar ingrediente ou receita</option>' +
+                `<optgroup label="🧂 Ingredientes">` +
+                dados.ingredientes.map(ing => `<option value="${ing.id}">${esc(ing.nome)} (${formatarMoeda(ing.precoUnidade)}/${ing.unidade})</option>`).join('') +
+                `</optgroup>` +
+                (bases.length ? `<optgroup label="🍕 Receitas (usar como base)">` +
+                    bases.map(r => `<option value="r:${r.id}">🍕 ${esc(r.nome)} (${formatarMoeda(r.custoTotal || 0)}/un${rendimentoDe(r) > 1 ? ' · rende ' + formatarNumero(rendimentoDe(r)) : ''})</option>`).join('') +
+                    `</optgroup>` : '');
             select.value = atual;
             select.onchange = preencherUnidadesIngredienteReceita;
             preencherUnidadesIngredienteReceita();
@@ -4766,6 +4829,25 @@
             const unidadeInformada = document.getElementById('unidadeIngredienteReceita').value;
 
             if (!ingredienteId || !qtdInformada || qtdInformada <= 0) { toast('Selecione um ingrediente e quantidade válida!', 'aviso'); return; }
+            if (String(ingredienteId).startsWith('r:')) {
+                const base = dados.receitas.find(r => 'r:' + r.id === ingredienteId);
+                if (!base) return;
+                if (base.id === dados.receitaAtual.id || receitaContem(base, dados.receitaAtual.id)) { toast('Uma receita não pode usar ela mesma.', 'aviso'); return; }
+                dados.receitaAtual.ingredientes.push({
+                    id: Date.now(),
+                    tipo: 'receita',
+                    receitaId: base.id,
+                    nome: base.nome,
+                    quantidade: qtdInformada,
+                    unidade: 'un',
+                    custoUnitario: base.custoTotal || 0,
+                    custoTotal: (base.custoTotal || 0) * qtdInformada
+                });
+                limparBuscaSelect('ingredienteReceita');
+                limparSelecaoIngredienteReceita();
+                atualizarIngredientesReceita();
+                return;
+            }
             const ing = dados.ingredientes.find(i => i.id == ingredienteId);
             if (!ing) return;
             const quantidade = paraUnidadeDoIngrediente(ing, qtdInformada, unidadeInformada || ing.unidade);
@@ -4796,6 +4878,7 @@
             if (!receita) return;
             atualizarBadgesPrec();
 
+            recalcularCustosReceitas();
             const rend = rendimentoDe(receita);
             const custoLote = receita.ingredientes.reduce((t, i) => t + i.custoTotal, 0);
             const custoTotal = custoLote / rend;     // custo de UMA unidade (é o que vai para o produto)
@@ -4805,7 +4888,7 @@
             document.getElementById('ingredientesReceita').innerHTML = receita.ingredientes.map(ing => `
                 <tr class="border-b" draggable="true">
                     <td class="py-3 px-2"><span class="drag-handle-receita cursor-move text-gray-400 hover:text-gray-600" title="Arrastar para reordenar">⋮⋮</span></td>
-                    <td class="py-3 px-2">${esc(ing.nome)}</td>
+                    <td class="py-3 px-2">${ing.tipo === 'receita' ? `🍕 ${esc(ing.nome)} <span class="text-xs text-blue-600">(receita base)</span>` : esc(ing.nome)}</td>
                     <td class="py-3 px-2 text-right font-medium">${esc(textoItemReceita(ing))}</td>
                     <td class="py-3 px-2 text-gray-500">${String(ing.unidadeInformada || '').startsWith('m:') && textoItemReceita(ing) !== formatarQtdAmigavel(ing.quantidade, ing.unidade) ? '= ' + esc(formatarQtdAmigavel(ing.quantidade, ing.unidade)) : '—'}</td>
                     <td class="py-3 px-2 text-right">${formatarMoeda(ing.custoUnitario)}/${esc(ing.unidade)}</td>
@@ -4893,6 +4976,7 @@
             if (!dados.receitaAtual) return;
             dados.receitaAtual.margem = parseFloat(document.getElementById('margemLucroReceita').value) || 60;
             dados.receitaAtual.precoVenda = parseFloat(document.getElementById('precoVendaSugerido').value) || 0;
+            recalcularCustosReceitas();
             salvarDados();
             atualizarListaReceitas();
             toast('Receita salva com sucesso!', 'sucesso');
@@ -4956,9 +5040,15 @@
         function cancelarEdicaoReceita() { atualizarListaReceitas(); }
 
         async function excluirReceita(id) {
-            if (await confirmarAcao('Tem certeza que deseja excluir esta receita? O produto ligado a ela deixa de dar baixa no estoque.')) {
+            const usam = receitasQueUsam(id);
+            const aviso = usam.length
+                ? `Esta receita é base de: ${usam.map(r => r.nome).join(', ')}. Se excluir, ela sai dessas receitas também. Excluir mesmo?`
+                : 'Tem certeza que deseja excluir esta receita? O produto ligado a ela deixa de dar baixa no estoque.';
+            if (await confirmarAcao(aviso)) {
                 if (dados.receitaAtual && dados.receitaAtual.id === id) fecharEditor();
                 dados.receitas = dados.receitas.filter(r => r.id !== id);
+                usam.forEach(r => { r.ingredientes = r.ingredientes.filter(ir => !(ir.tipo === 'receita' && ir.receitaId === id)); });
+                recalcularCustosReceitas();
                 salvarDados();
                 atualizarListaReceitas();
                 toast('Receita excluída.', 'info');
