@@ -698,6 +698,14 @@
                     </div>
                 </div>
 
+                <div class="flex items-center gap-2 flex-wrap mb-4 p-3 border border-blue-200 bg-blue-50 rounded-lg">
+                    <label for="rendimentoReceita" class="text-sm font-medium">🍽️ Esta receita rende</label>
+                    <input type="number" id="rendimentoReceita" min="1" step="any" value="1" inputmode="decimal"
+                           oninput="mudouRendimento()" class="w-24 px-3 py-2 border rounded-md text-center font-semibold">
+                    <span class="text-sm font-medium">unidade(s)</span>
+                    <p class="w-full text-xs text-gray-600">Ex.: massa e recheio para 100 empadas → coloque <strong>100</strong> e cadastre os ingredientes do lote inteiro. O sistema calcula o custo e a baixa no estoque de cada unidade.</p>
+                </div>
+
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
                     <select id="ingredienteReceita" class="px-3 py-2 border rounded-md">
                         <option value="">Selecionar ingrediente</option>
@@ -729,8 +737,12 @@
                 </div>
 
                 <div class="bg-green-50 p-4 rounded-lg">
+                    <div id="linhaCustoLote" class="flex justify-between text-sm text-gray-600 mb-1" style="display: none;">
+                        <span id="rotuloCustoLote">Custo do lote:</span>
+                        <span id="custoLoteReceita">R$ 0,00</span>
+                    </div>
                     <div class="flex justify-between text-lg font-bold mb-3">
-                        <span>Custo Total da Receita:</span>
+                        <span id="rotuloCustoReceita">Custo Total da Receita:</span>
                         <span id="custoTotalReceita" class="text-green-600">R$ 0,00</span>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2257,7 +2269,7 @@
                 if (!receita) return;
                 receita.ingredientes.forEach(ri => {
                     if (!(ri.quantidade > 0)) return;
-                    consumo[ri.ingredienteId] = (consumo[ri.ingredienteId] || 0) + ri.quantidade * item.quantidade;
+                    consumo[ri.ingredienteId] = (consumo[ri.ingredienteId] || 0) + ri.quantidade / rendimentoDe(receita) * item.quantidade;
                 });
             });
             return consumo;
@@ -2326,7 +2338,7 @@
                 receita.ingredientes.forEach(ri => {
                     const ing = dados.ingredientes.find(i => i.id == ri.ingredienteId);
                     if (!controlado(ing) || !(ri.quantidade > 0)) return;
-                    const u = Math.floor(Math.max(0, ing.estoque) / ri.quantidade + 1e-9);
+                    const u = Math.floor(Math.max(0, ing.estoque) / (ri.quantidade / rendimentoDe(receita)) + 1e-9);
                     if (u < unidades) { unidades = u; limitante = ing.nome; }
                 });
                 if (unidades !== Infinity) resultado.push({ produto, unidades, limitante });
@@ -4396,7 +4408,8 @@
                         afetadas++;
                     }
                 });
-                receita.custoTotal = receita.ingredientes.reduce((t, i) => t + i.custoTotal, 0);
+                receita.custoLote = receita.ingredientes.reduce((t, i) => t + i.custoTotal, 0);
+                receita.custoTotal = receita.custoLote / rendimentoDe(receita);
             });
 
             if (afetadas > 0) {
@@ -4640,6 +4653,7 @@
                                     </td>
                                     <td class="py-3 px-2 font-medium">
                                         <span class="receita-nome-${r.id}">${esc(r.nome)}</span>
+                                        ${rendimentoDe(r) > 1 ? `<span class="ml-1 inline-block text-xs font-normal px-2 py-0.5 rounded bg-blue-100 text-blue-800" title="Custo mostrado é por unidade">🍽️ rende ${formatarNumero(rendimentoDe(r))}</span>` : ''}
                                         ${r.ingredientes.length === 0 ? '<span class="ml-1 inline-block text-xs font-normal px-2 py-0.5 rounded bg-yellow-100 text-yellow-800">falta ingredientes</span>' : ''}
                                         <input type="text" class="receita-nome-edit-${r.id} px-2 py-1 border rounded w-full"
                                                value="${esc(r.nome)}" onkeypress="if(event.key==='Enter') salvarInfoReceita(${r.id})" style="display: none;">
@@ -4680,6 +4694,7 @@
             document.getElementById('editorReceita').style.display = 'block';
             document.getElementById('margemLucroReceita').value = receita.margem || 60;
             document.getElementById('precoVendaSugerido').value = receita.precoVenda > 0 ? receita.precoVenda.toFixed(2) : '';
+            document.getElementById('rendimentoReceita').value = rendimentoDe(receita);
 
             limparSelecaoIngredienteReceita();
             atualizarSelectIngredientes();
@@ -4781,7 +4796,10 @@
             if (!receita) return;
             atualizarBadgesPrec();
 
-            const custoTotal = receita.ingredientes.reduce((t, i) => t + i.custoTotal, 0);
+            const rend = rendimentoDe(receita);
+            const custoLote = receita.ingredientes.reduce((t, i) => t + i.custoTotal, 0);
+            const custoTotal = custoLote / rend;     // custo de UMA unidade (é o que vai para o produto)
+            receita.custoLote = custoLote;
             receita.custoTotal = custoTotal;
 
             document.getElementById('ingredientesReceita').innerHTML = receita.ingredientes.map(ing => `
@@ -4799,6 +4817,10 @@
             `).join('');
 
             document.getElementById('custoTotalReceita').textContent = formatarMoeda(custoTotal);
+            document.getElementById('linhaCustoLote').style.display = rend > 1 ? 'flex' : 'none';
+            document.getElementById('rotuloCustoLote').textContent = `Custo do lote (${formatarNumero(rend)} unidades):`;
+            document.getElementById('custoLoteReceita').textContent = formatarMoeda(custoLote);
+            document.getElementById('rotuloCustoReceita').textContent = rend > 1 ? 'Custo por unidade:' : 'Custo Total da Receita:';
 
             // O preço de venda só é preenchido uma vez (campo vazio e sem preço salvo). Depois não muda sozinho.
             const campoPreco = document.getElementById('precoVendaSugerido');
@@ -4807,6 +4829,17 @@
             }
             atualizarSugestao();
             atualizarMargemReal();
+        }
+
+        // Quantas unidades a receita rende (1 = receita de uma unidade)
+        function rendimentoDe(r) { return r && r.rendimento > 0 ? Number(r.rendimento) : 1; }
+
+        function mudouRendimento() {
+            const r = dados.receitaAtual;
+            if (!r) return;
+            const v = parseFloat(document.getElementById('rendimentoReceita').value);
+            r.rendimento = v > 0 ? v : 1;
+            atualizarIngredientesReceita();
         }
 
         // "5 fatias" / "15 g" — o que a pessoa digitou na receita
@@ -5764,7 +5797,8 @@
                         'Tem receita': receitaDoProduto(p) ? 'Sim' : 'Não'
                     })),
                     'Receitas': dados.receitas.map(r => ({
-                        Receita: r.nome, Categoria: r.categoria, Custo: n2(r.custoTotal), 'Preço de venda': n2(r.precoVenda),
+                        Receita: r.nome, Categoria: r.categoria, Rendimento: rendimentoDe(r), 'Custo do lote': n2(r.custoLote ?? r.custoTotal * rendimentoDe(r)),
+                        'Custo por unidade': n2(r.custoTotal), 'Preço de venda': n2(r.precoVenda),
                         Ingredientes: (r.ingredientes || []).map(i => `${i.nome}: ${textoItemReceita(i)}`).join('; ')
                     })),
                     'Ingredientes': dados.ingredientes.map(i => ({
