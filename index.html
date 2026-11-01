@@ -5011,17 +5011,24 @@
 
             const existente = dados.produtos.find(p => p.receitaId === receita.id) || dados.produtos.find(p => p.nome === receita.nome);
             if (existente) {
-                if (await confirmarAcao(`O produto "${receita.nome}" já existe. Deseja atualizar custo e preço de venda?`)) {
-                    existente.custo = custoTotal;
-                    existente.preco = preco;
-                    existente.receitaId = receita.id;
-                }
+                const mudaNome = existente.nome !== receita.nome;
+                const pergunta = mudaNome
+                    ? `Atualizar o produto #${existente.codigo} "${existente.nome}"? Ele passa a se chamar "${receita.nome}", com custo ${formatarMoeda(custoTotal)} e preço ${formatarMoeda(preco)}.`
+                    : `O produto #${existente.codigo} "${existente.nome}" já existe. Atualizar custo (${formatarMoeda(custoTotal)}) e preço de venda (${formatarMoeda(preco)})?`;
+                if (!(await confirmarAcao(pergunta))) return;
+                existente.nome = receita.nome;
+                existente.categoria = receita.categoria;
+                existente.custo = custoTotal;
+                existente.preco = preco;
+                existente.receitaId = receita.id;
             } else {
                 dados.produtos.push({ id: Date.now(), codigo: proximoCodigoProduto(), nome: receita.nome, custo: custoTotal, preco, categoria: receita.categoria, receitaId: receita.id });
             }
 
             salvarDados();
             atualizarListaReceitas();
+            atualizarProdutos();
+            atualizarProdutosPorCategoria();
             toast(`Produto "${receita.nome}" enviado! Custo: ${formatarMoeda(custoTotal)} — Preço: ${formatarMoeda(preco)}`, 'sucesso');
             fecharEditor();
         }
@@ -5042,16 +5049,28 @@
             if (!novoNome) { toast('O nome da receita não pode estar vazio!', 'aviso'); return; }
 
             const receita = dados.receitas.find(r => r.id === id);
+            let msg = 'Informações da receita atualizadas!';
             if (receita) {
-                // Mantém o vínculo com o produto mesmo trocando o nome
-                const produto = dados.produtos.find(p => p.receitaId === receita.id) || dados.produtos.find(p => p.nome === receita.nome);
-                if (produto && !produto.receitaId) produto.receitaId = receita.id;
+                // Mantém o vínculo com o(s) produto(s) mesmo trocando o nome
+                const prods = produtosDaReceita(receita);
+                prods.forEach(p => { p.receitaId = receita.id; });
                 receita.nome = novoNome;
                 receita.categoria = novaCategoria;
+                if (dados.receitaAtual === receita) document.getElementById('nomeReceitaAtual').textContent = novoNome;
+                // Receita de um produto só: o produto acompanha o nome e a categoria
+                if (prods.length === 1) {
+                    prods[0].nome = novoNome;
+                    prods[0].categoria = novaCategoria;
+                    msg = `Receita e produto #${prods[0].codigo} renomeados para "${novoNome}".`;
+                } else if (prods.length > 1) {
+                    msg = `Receita renomeada. Ela é usada por ${prods.length} produtos (${prods.map(p => '#' + p.codigo).join(', ')}), que mantêm os nomes deles.`;
+                }
             }
             salvarDados();
             atualizarListaReceitas();
-            toast('Informações da receita atualizadas!', 'sucesso');
+            atualizarProdutos();
+            atualizarProdutosPorCategoria();
+            toast(msg, 'sucesso');
         }
 
         function cancelarEdicaoReceita() { atualizarListaReceitas(); }
